@@ -7,8 +7,6 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
-    replaces = [('tickets', '0001_initial'), ('tickets', '0002_branchoption_issuetype_receivedbyoption_and_more'), ('tickets', '0003_panelbrandsettings'), ('tickets', '0004_panelbrandsettings_logo_image'), ('tickets', '0005_ticket_assignment_and_forwarding_fields'), ('tickets', '0006_alter_ticket_technician_name'), ('tickets', '0007_alter_ticket_time'), ('tickets', '0008_ticketremark'), ('tickets', '0006_add_forwarded_at'), ('tickets', '0007_add_indexes'), ('tickets', '0009_merge_0007_add_indexes_0008_ticketremark'), ('tickets', '0010_ticket_is_partner'), ('tickets', '0011_branch_target_daily_user_entry'), ('tickets', '0012_sync_new_user_monitoring_indexes'), ('tickets', '0012_remove_branch_tracking_add_ticket_new_user_fields'), ('tickets', '0013_merge_20260425_0010'), ('tickets', '0014_branchoption_monthly_target'), ('tickets', '0015_partneroption'), ('tickets', '0016_ticket_partner_user_name')]
-
     dependencies = [
     ]
 
