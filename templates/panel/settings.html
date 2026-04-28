@@ -1,0 +1,526 @@
+{% extends 'panel/base.html' %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block page_subtitle %}Account & system configuration{% endblock %}
+
+{% block content %}
+<div class="settings-grid">
+  <!-- CHANGE PASSWORD -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🔒 Change Password</h3>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="change_password">
+      <div class="card-body">
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input type="password" name="current_password" class="form-control" placeholder="Enter current password" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Password</label>
+            <input type="password" name="new_password" class="form-control" placeholder="Enter new password" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" placeholder="Confirm new password" required>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button type="submit" class="btn-primary">🔑 Change Password</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ACCOUNT INFO -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">👤 Account Information</h3>
+    </div>
+    <div class="card-body">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-label">Username</div>
+          <div class="detail-value mono accent">{{ user.username }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Full Name</div>
+          <div class="detail-value">{{ user.get_full_name|default:"Not set" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Email</div>
+          <div class="detail-value">{{ user.email|default:"Not set" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Role</div>
+          <div class="detail-value">
+            {% if user.is_superuser %}
+            <span class="tag tag-admin">Super Admin</span>
+            {% elif user.is_staff %}
+            <span class="tag tag-staff">Staff</span>
+            {% else %}
+            <span class="tag tag-user">User</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Date Joined</div>
+          <div class="detail-value subtle">{{ user.date_joined|date:"d M Y H:i" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Last Login</div>
+          <div class="detail-value subtle">{{ user.last_login|date:"d M Y H:i"|default:"Never" }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD BRANDING -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🖼️ Dashboard Branding</h3>
+    </div>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_branding">
+      <div class="card-body">
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Brand Name</label>
+            <input type="text" name="brand_name" class="form-control" value="{{ panel_brand.brand_name }}" placeholder="e.g. FRC CMS & TICKETS">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Brand Subtitle</label>
+            <input type="text" name="brand_subtitle" class="form-control" value="{{ panel_brand.brand_subtitle }}" placeholder="e.g. ADMIN PANEL">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Logo Icon (emoji/text)</label>
+            <input type="text" name="logo_icon" class="form-control" value="{{ panel_brand.logo_icon }}" placeholder="e.g. ⚡">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Upload Logo (PNG only)</label>
+            <input type="file" name="logo_image" class="form-control" accept=".png,image/png">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Logo Image URL (optional)</label>
+            <input type="url" name="logo_url" class="form-control" value="{{ panel_brand.logo_url }}" placeholder="https://example.com/logo.png">
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button type="submit" class="btn-primary">💾 Save Branding</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     CONFIGURATION MANAGEMENT TABLES
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<!-- ISSUE TYPES -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🔧 Issue Types <span class="card-badge">{{ issues|length }}</span></h3>
+    <button class="btn-primary" onclick="openModal('addIssueModal')">＋ Add Issue</button>
+  </div>
+  <div class="card-body no-pad">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr><th>Name (Value)</th><th>Display Name</th><th>Order</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for item in issues %}
+          <tr>
+            <td class="col-id">{{ item.name }}</td>
+            <td class="col-name">{{ item.display_name }}</td>
+            <td>{{ item.sort_order }}</td>
+            <td>
+              {% if item.is_active %}
+              <span class="status-pill status-solved">Active</span>
+              {% else %}
+              <span class="status-pill status-no-response">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="action-btns">
+                <button class="act-btn act-edit" onclick="editConfig('issue', {{ item.id }}, '{{ item.name|escapejs }}', '{{ item.display_name|escapejs }}', {{ item.sort_order }}, {{ item.is_active|yesno:'true,false' }})">✏️</button>
+                <button class="act-btn act-delete" onclick="deleteConfig('issue', {{ item.id }}, '{{ item.display_name|escapejs }}')">🗑</button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="empty-cell">No issue types configured</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TECHNICIANS -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">👷 Technicians <span class="card-badge">{{ technicians|length }}</span></h3>
+    <button class="btn-primary" onclick="openModal('addTechModal')">＋ Add Technician</button>
+  </div>
+  <div class="card-body no-pad">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr><th>Name (Value)</th><th>Display Name</th><th>Order</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for item in technicians %}
+          <tr>
+            <td class="col-id">{{ item.name }}</td>
+            <td class="col-name">{{ item.display_name }}</td>
+            <td>{{ item.monthly_target }}</td>
+            <td>{{ item.sort_order }}</td>
+            <td>
+              {% if item.is_active %}
+              <span class="status-pill status-solved">Active</span>
+              {% else %}
+              <span class="status-pill status-no-response">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="action-btns">
+                <button class="act-btn act-edit" onclick="editConfig('technician', {{ item.id }}, '{{ item.name|escapejs }}', '{{ item.display_name|escapejs }}', {{ item.sort_order }}, {{ item.is_active|yesno:'true,false' }})">✏️</button>
+                <button class="act-btn act-delete" onclick="deleteConfig('technician', {{ item.id }}, '{{ item.display_name|escapejs }}')">🗑</button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="empty-cell">No technicians configured</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- BRANCHES -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🏢 Branches <span class="card-badge">{{ branches|length }}</span></h3>
+    <button class="btn-primary" onclick="openModal('addBranchModal')">＋ Add Branch</button>
+  </div>
+  <div class="card-body no-pad">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr><th>Name (Value)</th><th>Display Name</th><th>Monthly Target</th><th>Order</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for item in branches %}
+          <tr>
+            <td class="col-id">{{ item.name }}</td>
+            <td class="col-name">{{ item.display_name }}</td>
+            <td>{{ item.monthly_target }}</td>
+            <td>{{ item.sort_order }}</td>
+            <td>
+              {% if item.is_active %}
+              <span class="status-pill status-solved">Active</span>
+              {% else %}
+              <span class="status-pill status-no-response">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="action-btns">
+                <button class="act-btn act-edit" onclick="editConfig('branch', {{ item.id }}, '{{ item.name|escapejs }}', '{{ item.display_name|escapejs }}', {{ item.sort_order }}, {{ item.is_active|yesno:'true,false' }})">✏️</button>
+                <button class="act-btn act-delete" onclick="deleteConfig('branch', {{ item.id }}, '{{ item.display_name|escapejs }}')">🗑</button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="empty-cell">No branches configured</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIVED BY -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">📞 Received By <span class="card-badge">{{ received_by_options|length }}</span></h3>
+    <button class="btn-primary" onclick="openModal('addReceivedModal')">＋ Add Option</button>
+  </div>
+  <div class="card-body no-pad">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr><th>Name (Value)</th><th>Display Name</th><th>Order</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for item in received_by_options %}
+          <tr>
+            <td class="col-id">{{ item.name }}</td>
+            <td class="col-name">{{ item.display_name }}</td>
+            <td>{{ item.sort_order }}</td>
+            <td>
+              {% if item.is_active %}
+              <span class="status-pill status-solved">Active</span>
+              {% else %}
+              <span class="status-pill status-no-response">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="action-btns">
+                <button class="act-btn act-edit" onclick="editConfig('received_by', {{ item.id }}, '{{ item.name|escapejs }}', '{{ item.display_name|escapejs }}', {{ item.sort_order }}, {{ item.is_active|yesno:'true,false' }})">✏️</button>
+                <button class="act-btn act-delete" onclick="deleteConfig('received_by', {{ item.id }}, '{{ item.display_name|escapejs }}')">🗑</button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="empty-cell">No options configured</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ADD MODALS ═══════════════ -->
+
+<!-- ADD ISSUE MODAL -->
+<div class="modal-overlay" id="addIssueModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 class="modal-title">🔧 Add Issue Type</h3>
+      <button class="modal-close" onclick="closeModal('addIssueModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'config_add' 'issue' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Value (stored in DB)</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. SLOW SPEED" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <input type="text" name="display_name" class="form-control" placeholder="e.g. Slow Speed" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addIssueModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD TECHNICIAN MODAL -->
+<div class="modal-overlay" id="addTechModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 class="modal-title">👷 Add Technician</h3>
+      <button class="modal-close" onclick="closeModal('addTechModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'config_add' 'technician' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Value (stored in DB)</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. SALAM" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <input type="text" name="display_name" class="form-control" placeholder="e.g. Salam" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addTechModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD BRANCH MODAL -->
+<div class="modal-overlay" id="addBranchModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 class="modal-title">🏢 Add Branch</h3>
+      <button class="modal-close" onclick="closeModal('addBranchModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'config_add' 'branch' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Value (stored in DB)</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. Ullapara" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <input type="text" name="display_name" class="form-control" placeholder="e.g. Ullapara" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monthly Target</label>
+            <input type="number" name="monthly_target" class="form-control" value="0" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addBranchModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD RECEIVED BY MODAL -->
+<div class="modal-overlay" id="addReceivedModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 class="modal-title">📞 Add Received By</h3>
+      <button class="modal-close" onclick="closeModal('addReceivedModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'config_add' 'received_by' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Value (stored in DB)</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. NOC" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <input type="text" name="display_name" class="form-control" placeholder="e.g. NOC" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addReceivedModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT CONFIG MODAL (shared) -->
+<div class="modal-overlay" id="editConfigModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 class="modal-title">✏️ Edit <span id="editConfigType"></span></h3>
+      <button class="modal-close" onclick="closeModal('editConfigModal')">✕</button>
+    </div>
+    <form method="post" id="editConfigForm">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Value (stored in DB)</label>
+            <input type="text" name="name" id="editConfigName" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <input type="text" name="display_name" id="editConfigDisplay" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sort_order" id="editConfigOrder" class="form-control" value="0">
+          </div>
+          <div class="form-group" id="editConfigMonthlyTargetGroup" style="display:none;">
+            <label class="form-label">Monthly Target</label>
+            <input type="number" name="monthly_target" id="editConfigMonthlyTarget" class="form-control" value="0" min="0">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_active" id="editConfigActive"> Active
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editConfigModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- DELETE CONFIG MODAL -->
+<div class="modal-overlay" id="deleteConfigModal">
+  <div class="modal modal-sm">
+    <div class="modal-body" style="text-align:center; padding: 32px;">
+      <div style="font-size:48px; margin-bottom:16px;">🗑️</div>
+      <h3 class="modal-del-title">Delete <span id="deleteConfigType"></span>?</h3>
+      <p class="modal-del-msg" id="deleteConfigMsg"></p>
+      <form method="post" id="deleteConfigForm">
+        {% csrf_token %}
+        <div class="modal-del-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('deleteConfigModal')">Cancel</button>
+          <button type="submit" class="btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const configLabels = {
+    'issue': 'Issue Type',
+    'received_by': 'Received By',
+    'technician': 'Technician',
+    'branch': 'Branch'
+  };
+
+  function editConfig(type, id, name, displayName, order, isActive, monthlyTarget) {
+    document.getElementById('editConfigType').textContent = configLabels[type] || type;
+    document.getElementById('editConfigForm').action = `/panel/config/${type}/edit/${id}/`;
+    document.getElementById('editConfigName').value = name;
+    document.getElementById('editConfigDisplay').value = displayName;
+    document.getElementById('editConfigOrder').value = order;
+    document.getElementById('editConfigActive').checked = isActive;
+    const monthlyTargetGroup = document.getElementById('editConfigMonthlyTargetGroup');
+    const monthlyTargetInput = document.getElementById('editConfigMonthlyTarget');
+    if (type === 'branch') {
+      const sourceRow = document.activeElement ? document.activeElement.closest('tr') : null;
+      const targetFromTable = sourceRow && sourceRow.children[2] ? sourceRow.children[2].textContent.trim() : '0';
+      monthlyTargetGroup.style.display = '';
+      monthlyTargetInput.value = monthlyTarget ?? targetFromTable ?? 0;
+    } else {
+      monthlyTargetGroup.style.display = 'none';
+      monthlyTargetInput.value = 0;
+    }
+    openModal('editConfigModal');
+  }
+
+  function deleteConfig(type, id, displayName) {
+    document.getElementById('deleteConfigType').textContent = configLabels[type] || type;
+    document.getElementById('deleteConfigMsg').textContent = `Are you sure you want to delete "${displayName}"? This cannot be undone.`;
+    document.getElementById('deleteConfigForm').action = `/panel/config/${type}/delete/${id}/`;
+    openModal('deleteConfigModal');
+  }
+</script>
+{% endblock %}

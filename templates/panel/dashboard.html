@@ -1,0 +1,433 @@
+{% extends 'panel/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Welcome back, {{ user.get_full_name|default:user.username }}{% endblock %}
+
+{% block topbar_actions %}
+<div class="dashboard-live-pill" id="dashboardLivePill" title="Dashboard updates automatically">
+  <span class="live-dot"></span>
+  <span id="dashboardLiveText">Live</span>
+</div>
+<button type="button" class="btn-outline dashboard-refresh-btn" id="dashboardRefreshBtn" title="Refresh dashboard now">
+  <span class="refresh-icon">&#8635;</span>
+  Refresh
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- STATS CARDS -->
+<div class="stats-row">
+  <div class="stat-card stat-blue">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Total Tickets</span>
+        <span class="stat-value" id="dash-total">{{ total }}</span>
+      </div>
+      <div class="stat-icon-wrap"><span class="stat-icon-circle si-blue">🎫</span></div>
+    </div>
+    <div class="stat-bar"><div class="stat-bar-fill" id="dash-total-bar" style="width: 100%;"></div></div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Solved</span>
+        <span class="stat-value" id="dash-solved">{{ solved }}</span>
+      </div>
+      <div class="stat-icon-wrap"><span class="stat-icon-circle si-green">✅</span></div>
+    </div>
+    <div class="stat-bar"><div class="stat-bar-fill" id="dash-solved-bar" style="width: {{ solve_rate }}%;"></div></div>
+  </div>
+  <div class="stat-card stat-amber">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Pending</span>
+        <span class="stat-value" id="dash-pending">{{ pending }}</span>
+      </div>
+      <div class="stat-icon-wrap"><span class="stat-icon-circle si-amber">⏳</span></div>
+    </div>
+    <div class="stat-bar"><div class="stat-bar-fill" id="dash-pending-bar" style="width: {% widthratio pending total 100 %}%;"></div></div>
+  </div>
+  <div class="stat-card stat-purple">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Time Taken</span>
+        <span class="stat-value" id="dash-time-taken">{{ time_taken }}</span>
+      </div>
+      <div class="stat-icon-wrap"><span class="stat-icon-circle si-purple">🕐</span></div>
+    </div>
+    <div class="stat-bar"><div class="stat-bar-fill" id="dash-time-taken-bar" style="width: {% widthratio time_taken total 100 %}%;"></div></div>
+  </div>
+  <div class="stat-card stat-red">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">No Response</span>
+        <span class="stat-value" id="dash-no-response">{{ no_response }}</span>
+      </div>
+      <div class="stat-icon-wrap"><span class="stat-icon-circle si-red">🔕</span></div>
+    </div>
+    <div class="stat-bar"><div class="stat-bar-fill" id="dash-no-response-bar" style="width: {% widthratio no_response total 100 %}%;"></div></div>
+  </div>
+  <div class="stat-card stat-cyan">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Today</span>
+        <span class="stat-value" id="dash-today">{{ today_count }}</span>
+      </div>
+      <div class="stat-icon-wrap"><span class="stat-icon-circle si-cyan">📅</span></div>
+    </div>
+    <div class="stat-footer">
+      <span class="stat-trend {% if week_trend >= 0 %}trend-up{% else %}trend-down{% endif %}" id="dash-week-trend">
+        {% if week_trend >= 0 %}↑{% else %}↓{% endif %} {{ week_trend }}% this week
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- HIGHLIGHT ROW -->
+<div class="highlight-row">
+  <div class="highlight-card hl-gradient-1">
+    <div class="highlight-icon-box hib-1">📊</div>
+    <div class="highlight-info">
+      <span class="highlight-value" id="dash-solve-rate">{{ solve_rate }}%</span>
+      <span class="highlight-label">Solve Rate</span>
+    </div>
+    <div class="highlight-ring">
+      <svg viewBox="0 0 36 36" class="highlight-ring-svg">
+        <circle cx="18" cy="18" r="15.915" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
+        <circle cx="18" cy="18" r="15.915" fill="none" stroke="url(#grad1)" stroke-width="3" id="dash-solve-ring"
+          stroke-dasharray="{{ solve_rate }}, 100" stroke-linecap="round" transform="rotate(-90 18 18)"/>
+        <defs><linearGradient id="grad1"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#34d399"/></linearGradient></defs>
+      </svg>
+    </div>
+  </div>
+  <div class="highlight-card hl-gradient-2">
+    <div class="highlight-icon-box hib-2">📆</div>
+    <div class="highlight-info">
+      <span class="highlight-value" id="dash-week-count">{{ week_count }}</span>
+      <span class="highlight-label">This Week</span>
+    </div>
+  </div>
+  <div class="highlight-card hl-gradient-3">
+    <div class="highlight-icon-box hib-3">📅</div>
+    <div class="highlight-info">
+      <span class="highlight-value" id="dash-month-count">{{ month_count }}</span>
+      <span class="highlight-label">This Month</span>
+    </div>
+  </div>
+</div>
+
+<!-- CHARTS ROW -->
+<div class="grid-2">
+  <!-- DAILY TREND -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">📈 Daily Ticket Trend</h3>
+      <span class="card-badge">14 Days</span>
+    </div>
+    <div class="card-body">
+      <div class="chart-area" id="dailyChart"></div>
+    </div>
+  </div>
+
+  <!-- STATUS DISTRIBUTION -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🎯 Status Distribution</h3>
+    </div>
+    <div class="card-body">
+      <div class="donut-chart-container">
+        <div class="donut-chart" id="statusDonut">
+          <svg viewBox="0 0 120 120" class="donut-svg">
+            <!-- filled by JS -->
+          </svg>
+          <div class="donut-center">
+            <span class="donut-value" id="dash-donut-total">{{ total }}</span>
+            <span class="donut-label">Total</span>
+          </div>
+        </div>
+        <div class="donut-legend" id="statusLegend"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM ROW -->
+<div class="grid-2">
+  <!-- TOP ISSUES -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🔥 Top Issues</h3>
+    </div>
+    <div class="card-body">
+      <div class="bar-chart" id="issueChart"></div>
+    </div>
+  </div>
+
+  <!-- RECENT TICKETS -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🕐 Recent Tickets</h3>
+      <a href="{% url 'panel_tickets' %}" class="card-action">View All →</a>
+    </div>
+    <div class="card-body no-pad">
+      <div class="mini-table" id="recentTickets">
+        {% for ticket in recent_tickets %}
+        <a href="{% url 'panel_ticket_detail' ticket.sn %}" class="mini-row">
+          <div class="mini-sn">#{{ ticket.sn }}</div>
+          <div class="mini-info">
+            <span class="mini-name">{{ ticket.user_name }}</span>
+            <span class="mini-issue">{{ ticket.issue }}</span>
+          </div>
+          <div class="mini-status status-dot-{{ ticket.status|slugify }}">
+            {% if ticket.status == 'SOLVED' %}✅{% elif ticket.status == 'PENDING' %}⏳{% elif ticket.status == 'TIME TAKEN' %}🕐{% else %}🔕{% endif %}
+          </div>
+        </a>
+        {% empty %}
+        <div class="empty-mini">No tickets yet</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BRANCH & TECHNICIAN -->
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🏢 Branch Distribution</h3>
+    </div>
+    <div class="card-body">
+      <div class="bar-chart" id="branchChart"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🔧 Top Assignees</h3>
+    </div>
+    <div class="card-body">
+      <div class="bar-chart" id="techChart"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const dashboardLiveUrl = "{% url 'panel_dashboard_data' %}";
+  const dailyLabels = {{ daily_labels|default:"[]"|safe }};
+  const dailyValues = {{ daily_values|default:"[]"|safe }};
+  const statusData = {{ status_data|default:"[]"|safe }};
+  const topIssues = {{ top_issues|default:"[]"|safe }};
+  const topTechnicians = {{ top_technicians|default:"[]"|safe }};
+  const branchStats = {{ branch_stats|default:"[]"|safe }};
+  const dashboardPollMs = 10000;
+  let dashboardChartSignatures = {};
+  let dashboardRefreshing = false;
+
+  const numberFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+
+  function dashboardNumber(value) {
+    return numberFormat.format(Number(value) || 0);
+  }
+
+  function dashboardPercent(value) {
+    return Math.max(0, Math.min(100, Number(value) || 0));
+  }
+
+  function dashboardEscape(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function dashboardSlug(value) {
+    return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  }
+
+  function setDashboardText(id, value, suffix = '') {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    const next = `${dashboardNumber(value)}${suffix}`;
+    if (el.textContent.trim() === next) return;
+
+    el.textContent = next;
+    el.classList.remove('is-updated');
+    void el.offsetWidth;
+    el.classList.add('is-updated');
+  }
+
+  function setDashboardBar(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.style.width = `${dashboardPercent(value)}%`;
+  }
+
+  function setDashboardTrend(value) {
+    const el = document.getElementById('dash-week-trend');
+    if (!el) return;
+
+    const trend = Number(value) || 0;
+    el.classList.toggle('trend-up', trend >= 0);
+    el.classList.toggle('trend-down', trend < 0);
+    el.textContent = `${trend >= 0 ? '\u2191' : '\u2193'} ${dashboardNumber(Math.abs(trend))}% this week`;
+  }
+
+  function statusIcon(status) {
+    if (status === 'SOLVED') return '&#10003;';
+    if (status === 'PENDING') return '&#9203;';
+    if (status === 'TIME TAKEN') return '&#128336;';
+    return '&#128263;';
+  }
+
+  function renderRecentTickets(tickets) {
+    const container = document.getElementById('recentTickets');
+    if (!container) return;
+
+    if (!tickets || tickets.length === 0) {
+      container.innerHTML = '<div class="empty-mini">No tickets yet</div>';
+      return;
+    }
+
+    container.innerHTML = tickets.map(ticket => {
+      const status = dashboardEscape(ticket.status || '');
+      const detailUrl = dashboardEscape(ticket.detail_url || `/panel/tickets/detail/${ticket.sn}/`);
+      return `
+        <a href="${detailUrl}" class="mini-row">
+          <div class="mini-sn">#${dashboardEscape(ticket.sn)}</div>
+          <div class="mini-info">
+            <span class="mini-name">${dashboardEscape(ticket.user_name || '-')}</span>
+            <span class="mini-issue">${dashboardEscape(ticket.issue || '-')}</span>
+          </div>
+          <div class="mini-status status-dot-${dashboardSlug(status)}">${statusIcon(status)}</div>
+        </a>
+      `;
+    }).join('');
+  }
+
+  function renderDashboardChart(key, signature, renderFn) {
+    if (dashboardChartSignatures[key] === signature) return;
+    dashboardChartSignatures[key] = signature;
+    renderFn();
+  }
+
+  function renderDashboardCharts(data) {
+    renderDashboardChart(
+      'daily',
+      JSON.stringify([data.daily_labels, data.daily_values]),
+      () => renderBarChart('dailyChart', data.daily_labels || [], data.daily_values || [], '#3b82f6', true)
+    );
+    renderDashboardChart(
+      'status',
+      JSON.stringify(data.status_data || []),
+      () => renderDonut('statusDonut', 'statusLegend', data.status_data || [])
+    );
+    renderDashboardChart(
+      'issues',
+      JSON.stringify(data.top_issues || []),
+      () => renderHorizontalBars('issueChart', (data.top_issues || []).map(d => ({ label: d.issue, value: d.count })), '#8b5cf6')
+    );
+    renderDashboardChart(
+      'branches',
+      JSON.stringify(data.branch_stats || []),
+      () => renderHorizontalBars('branchChart', (data.branch_stats || []).map(d => ({ label: d.branch, value: d.count })), '#10b981')
+    );
+    renderDashboardChart(
+      'technicians',
+      JSON.stringify(data.top_technicians || []),
+      () => renderHorizontalBars('techChart', (data.top_technicians || []).map(d => ({ label: d.technician_name, value: d.count })), '#f59e0b')
+    );
+  }
+
+  function applyDashboardData(data) {
+    const total = Number(data.total) || 0;
+
+    setDashboardText('dash-total', total);
+    setDashboardText('dash-solved', data.solved);
+    setDashboardText('dash-pending', data.pending);
+    setDashboardText('dash-time-taken', data.time_taken);
+    setDashboardText('dash-no-response', data.no_response);
+    setDashboardText('dash-today', data.today_count);
+    setDashboardText('dash-solve-rate', data.solve_rate, '%');
+    setDashboardText('dash-week-count', data.week_count);
+    setDashboardText('dash-month-count', data.month_count);
+    setDashboardText('dash-donut-total', total);
+
+    setDashboardBar('dash-total-bar', 100);
+    setDashboardBar('dash-solved-bar', data.solve_rate);
+    setDashboardBar('dash-pending-bar', total ? (Number(data.pending) || 0) / total * 100 : 0);
+    setDashboardBar('dash-time-taken-bar', total ? (Number(data.time_taken) || 0) / total * 100 : 0);
+    setDashboardBar('dash-no-response-bar', total ? (Number(data.no_response) || 0) / total * 100 : 0);
+    setDashboardTrend(data.week_trend);
+
+    const solveRing = document.getElementById('dash-solve-ring');
+    if (solveRing) solveRing.setAttribute('stroke-dasharray', `${dashboardPercent(data.solve_rate)}, 100`);
+
+    renderDashboardCharts(data);
+    renderRecentTickets(data.recent_tickets);
+  }
+
+  function setDashboardLiveState(text, state = 'ok') {
+    const pill = document.getElementById('dashboardLivePill');
+    const liveText = document.getElementById('dashboardLiveText');
+    if (liveText) liveText.textContent = text;
+    if (pill) {
+      pill.classList.toggle('is-error', state === 'error');
+      pill.classList.toggle('is-refreshing', state === 'refreshing');
+    }
+  }
+
+  async function refreshDashboard(silent = true) {
+    if (dashboardRefreshing) return;
+    dashboardRefreshing = true;
+    setDashboardLiveState('Updating', 'refreshing');
+
+    try {
+      const response = await fetch(dashboardLiveUrl, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        cache: 'no-store'
+      });
+
+      if (!response.ok) throw new Error(`Dashboard update failed: ${response.status}`);
+
+      const data = await response.json();
+      applyDashboardData(data);
+      const updatedAt = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setDashboardLiveState(`Live ${updatedAt}`);
+    } catch (error) {
+      setDashboardLiveState('Update failed', 'error');
+      if (!silent && typeof showToast === 'function') {
+        showToast('Dashboard update failed. Please check the connection.', 'error');
+      }
+    } finally {
+      dashboardRefreshing = false;
+    }
+  }
+
+  renderDashboardCharts({
+    daily_labels: dailyLabels,
+    daily_values: dailyValues,
+    status_data: statusData,
+    top_issues: topIssues,
+    top_technicians: topTechnicians,
+    branch_stats: branchStats,
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const refreshBtn = document.getElementById('dashboardRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => refreshDashboard(false));
+
+    setTimeout(() => refreshDashboard(true), 2500);
+    setInterval(() => {
+      if (!document.hidden) refreshDashboard(true);
+    }, dashboardPollMs);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshDashboard(true);
+    });
+  });
+</script>
+{% endblock %}

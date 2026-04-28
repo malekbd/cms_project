@@ -1,0 +1,241 @@
+{% extends 'panel/base.html' %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block page_subtitle %}Detailed performance insights{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'panel_export_csv' %}?date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline" id="btn-export-report">📥 Export CSV</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-body" style="padding: 16px 20px;">
+    <form method="get" class="report-filter">
+      <div class="report-filter-group">
+        <label class="form-label">From</label>
+        <input type="date" name="date_from" class="filter-input" value="{{ date_from }}">
+      </div>
+      <div class="report-filter-group">
+        <label class="form-label">To</label>
+        <input type="date" name="date_to" class="filter-input" value="{{ date_to }}">
+      </div>
+      <button type="submit" class="btn-primary" style="align-self: flex-end;">📊 Generate Report</button>
+    </form>
+  </div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card stat-blue">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Total</span>
+        <span class="stat-value">{{ total }}</span>
+      </div>
+      <div class="stat-icon-wrap">🎫</div>
+    </div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Solved</span>
+        <span class="stat-value">{{ solved }}</span>
+      </div>
+      <div class="stat-icon-wrap">✅</div>
+    </div>
+  </div>
+  <div class="stat-card stat-amber">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Pending</span>
+        <span class="stat-value">{{ pending }}</span>
+      </div>
+      <div class="stat-icon-wrap">⏳</div>
+    </div>
+  </div>
+  <div class="stat-card stat-purple">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Time Taken</span>
+        <span class="stat-value">{{ time_taken }}</span>
+      </div>
+      <div class="stat-icon-wrap">🕐</div>
+    </div>
+  </div>
+  <div class="stat-card stat-red">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">No Response</span>
+        <span class="stat-value">{{ no_response }}</span>
+      </div>
+      <div class="stat-icon-wrap">🔕</div>
+    </div>
+  </div>
+  <div class="stat-card stat-cyan">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Solve Rate</span>
+        <span class="stat-value">{{ solve_rate }}%</span>
+      </div>
+      <div class="stat-icon-wrap">📊</div>
+    </div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-card-inner">
+      <div class="stat-info">
+        <span class="stat-label">Total New Users</span>
+        <span class="stat-value">{{ total_new_users }}</span>
+      </div>
+      <div class="stat-icon-wrap">+</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🤖 AI Agent Analysis</h3>
+    <span class="card-badge ai-health-{{ ai_report.health|default:'neutral' }}">{{ ai_report.health|upper }}</span>
+  </div>
+  <div class="card-body">
+    <p class="ai-headline">{{ ai_report.headline }}</p>
+    <div class="grid-2" style="margin-bottom: 0;">
+      <div>
+        <h4 class="ai-section-title">Key Insights</h4>
+        <ul class="ai-list">
+          {% for item in ai_report.insights %}
+          <li>{{ item }}</li>
+          {% empty %}
+          <li>No insights available.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h4 class="ai-section-title">Recommended Actions</h4>
+        <ul class="ai-list">
+          {% for item in ai_report.recommendations %}
+          <li>{{ item }}</li>
+          {% empty %}
+          <li>No recommendations available.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">📈 Daily Ticket Trend</h3>
+  </div>
+  <div class="card-body">
+    <div class="chart-area" id="reportDailyChart"></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🔧 Assigned To Performance</h3>
+    </div>
+    <div class="card-body no-pad">
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Assigned To</th>
+              <th>Total</th>
+              <th>Solved</th>
+              <th>Pending</th>
+              <th>Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in tech_report %}
+            <tr>
+              <td class="col-name">{{ row.technician_name }}</td>
+              <td>{{ row.total }}</td>
+              <td style="color: var(--green);">{{ row.solved_count }}</td>
+              <td style="color: var(--yellow);">{{ row.pending_count }}</td>
+              <td>
+                {% if row.total > 0 %}
+                <div class="mini-progress">
+                  <div class="mini-progress-fill" style="width: {% widthratio row.solved_count row.total 100 %}%;"></div>
+                </div>
+                <span class="mini-pct">{% widthratio row.solved_count row.total 100 %}%</span>
+                {% else %}
+                <span class="mini-pct">0%</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="text-align:center; color: var(--text3); padding:24px;">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🏢 Branch Performance</h3>
+    </div>
+    <div class="card-body no-pad">
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Branch</th>
+              <th>Total</th>
+              <th>Solved</th>
+              <th>Pending</th>
+              <th>Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in branch_report %}
+            <tr>
+              <td class="col-name">{{ row.branch }}</td>
+              <td>{{ row.total }}</td>
+              <td style="color: var(--green);">{{ row.solved_count }}</td>
+              <td style="color: var(--yellow);">{{ row.pending_count }}</td>
+              <td>
+                {% if row.total > 0 %}
+                <div class="mini-progress">
+                  <div class="mini-progress-fill" style="width: {% widthratio row.solved_count row.total 100 %}%;"></div>
+                </div>
+                <span class="mini-pct">{% widthratio row.solved_count row.total 100 %}%</span>
+                {% else %}
+                <span class="mini-pct">0%</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="text-align:center; color: var(--text3); padding:24px;">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🔥 Issue Breakdown</h3>
+  </div>
+  <div class="card-body">
+    <div class="bar-chart" id="reportIssueChart"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const dailyLabels = {{ daily_labels|safe }};
+  const dailyValues = {{ daily_values|safe }};
+  const issueReport = {{ issue_report|safe }};
+
+  renderBarChart('reportDailyChart', dailyLabels, dailyValues, '#3b82f6', true);
+  renderHorizontalBars('reportIssueChart', issueReport.map(d => ({label: d.issue, value: d.total})), '#8b5cf6');
+</script>
+{% endblock %}

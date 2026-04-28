@@ -1,0 +1,375 @@
+{% extends 'panel/base.html' %}
+{% block title %}Partner Tickets{% endblock %}
+{% block page_title %}Partner Ticket Management{% endblock %}
+{% block page_subtitle %}{{ total_filtered }} partner tickets found{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openModal('addTicketModal')" id="btn-new-ticket">＋ New Ticket</button>
+<a href="{% url 'panel_export_csv' %}?date_from={{ date_from }}&date_to={{ date_to }}&status={{ status_filter }}&is_partner=True" class="btn-outline" id="btn-export">📥 Export CSV</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="ticket-tabs" id="ticketTabs">
+  <button class="ticket-tab tab-active active" onclick="switchTab('active')" id="tabActive">
+    🔥 Active Tickets <span class="tab-badge">{{ active_count }}</span>
+  </button>
+  <button class="ticket-tab tab-solved" onclick="switchTab('solved')" id="tabSolved">
+    ✅ Solved Tickets <span class="tab-badge">{{ solved_count }}</span>
+  </button>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <form method="get" class="filters-bar" id="ticketFilters">
+    <input type="text" name="search" class="filter-input" placeholder="🔍 Search partner, cell..." value="{{ search }}">
+    
+    <select name="status" class="filter-select">
+      <option value="">All Status</option>
+      {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="issue" class="filter-select">
+      <option value="">All Issues</option>
+      {% for val, label in issue_choices %}
+      <option value="{{ val }}" {% if issue_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <input type="date" name="date_from" class="filter-input filter-date" value="{{ date_from }}">
+    <input type="date" name="date_to" class="filter-input filter-date" value="{{ date_to }}">
+    
+    <button type="submit" class="btn-filter">Filter</button>
+    <a href="{% url 'panel_partner_tickets' %}" class="btn-clear">✕ Clear</a>
+  </form>
+</div>
+
+<div class="tab-panel active" id="panelActive">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🔥 Active Partner Tickets <span class="card-badge">{{ active_count }}</span></h3>
+    </div>
+    <div class="table-responsive">
+      {% if active_tickets %}
+      <table class="data-table" id="activeTicketsTable">
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Date</th>
+            <th>Partner Name</th>
+            <th>User Name</th>
+            <th>Cell No</th>
+            <th>Issue</th>
+            <th>Received By</th>
+            <th>Time</th>
+            <th>Forwarded To</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in active_tickets %}
+          <tr>
+            <td class="col-sn">
+              <div class="sn-hover-card">
+                <span class="sn-trigger">#{{ ticket.sn }}</span>
+                <div class="sn-popover" hidden aria-hidden="true">
+                  <div class="sn-popover-head">
+                    <span class="sn-popover-title">Ticket #{{ ticket.sn }}</span>
+                    <span class="sn-popover-status status-{{ ticket.status|slugify }}">{{ ticket.status }}</span>
+                  </div>
+                  <div class="sn-popover-grid">
+                    <div><label>Partner</label><strong>{{ ticket.user_name }}</strong></div>
+                    <div><label>User</label><strong>{{ ticket.partner_user_name|default:"-" }}</strong></div>
+                    <div><label>Cell</label><strong>{{ ticket.cell_no }}</strong></div>
+                    <div><label>Issue</label><strong>{{ ticket.issue }}</strong></div>
+                    <div><label>Received By</label><strong>{{ ticket.received_by }}</strong></div>
+                    <div><label>Forwarded To</label><strong>{{ ticket.forwarded_to|default:"-" }}</strong></div>
+                    <div><label>Time</label><strong>{{ ticket.time|time:"H:i" }}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ ticket.date|date:"d M Y" }}</td>
+            <td class="col-name">{{ ticket.user_name }}</td>
+            <td class="col-name">{{ ticket.partner_user_name|default:"-" }}</td>
+            <td>{{ ticket.cell_no }}</td>
+            <td><span class="tag tag-issue">{{ ticket.issue }}</span></td>
+            <td>{{ ticket.received_by }}</td>
+            <td>{{ ticket.time|time:"H:i" }}</td>
+            <td>{{ ticket.forwarded_to|default:"-" }}</td>
+            <td>
+              <div class="status-dropdown">
+                <button class="status-pill status-{{ ticket.status|slugify }}" onclick="toggleStatusMenu(this, {{ ticket.sn }})" id="status-btn-{{ ticket.sn }}">
+                  {% if ticket.status == 'SOLVED' %}✅{% elif ticket.status == 'PENDING' %}⏳{% elif ticket.status == 'TIME TAKEN' %}🕐{% else %}🔕{% endif %}
+                  {{ ticket.status }}
+                </button>
+                <div class="status-menu" id="menu-{{ ticket.sn }}">
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'SOLVED')">✅ Solved</div>
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'PENDING')">⏳ Pending</div>
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'TIME TAKEN')">🕐 Time Taken</div>
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'No Response')">🔕 No Response</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="action-btns">
+                <a href="{% url 'panel_ticket_detail' ticket.sn %}" class="act-btn act-view" title="View">👁</a>
+                <a href="{% url 'panel_edit_ticket' ticket.sn %}" class="act-btn act-edit" title="Edit">✏️</a>
+                {% if request.user.is_superuser %}
+                <button class="act-btn act-delete" onclick="confirmDelete({{ ticket.sn }}, '{{ ticket.user_name|escapejs }}')" title="Delete">🗑</button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">🎉</div>
+        <p>No active partner tickets found!</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="panelSolved">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">✅ Solved Partner Tickets <span class="card-badge">{{ solved_count }}</span></h3>
+    </div>
+    <div class="table-responsive">
+      {% if solved_tickets %}
+      <table class="data-table" id="solvedTicketsTable">
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Date</th>
+            <th>Partner Name</th>
+            <th>User Name</th>
+            <th>Cell No</th>
+            <th>Issue</th>
+            <th>Received By</th>
+            <th>Time</th>
+            <th>Forwarded To</th>
+            <th>Status</th>
+            <th>Solved At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in solved_tickets %}
+          <tr>
+            <td class="col-sn">
+              <div class="sn-hover-card">
+                <span class="sn-trigger">#{{ ticket.sn }}</span>
+                <div class="sn-popover" hidden aria-hidden="true">
+                  <div class="sn-popover-head">
+                    <span class="sn-popover-title">Ticket #{{ ticket.sn }}</span>
+                    <span class="sn-popover-status status-{{ ticket.status|slugify }}">{{ ticket.status }}</span>
+                  </div>
+                  <div class="sn-popover-grid">
+                    <div><label>Partner</label><strong>{{ ticket.user_name }}</strong></div>
+                    <div><label>User</label><strong>{{ ticket.partner_user_name|default:"-" }}</strong></div>
+                    <div><label>Cell</label><strong>{{ ticket.cell_no }}</strong></div>
+                    <div><label>Issue</label><strong>{{ ticket.issue }}</strong></div>
+                    <div><label>Forwarded To</label><strong>{{ ticket.forwarded_to|default:"-" }}</strong></div>
+                    <div><label>Solved At</label><strong>{{ ticket.solved_at|date:"d M Y H:i"|default:"-" }}</strong></div>
+                    <div><label>Received By</label><strong>{{ ticket.received_by }}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ ticket.date|date:"d M Y" }}</td>
+            <td class="col-name">{{ ticket.user_name }}</td>
+            <td class="col-name">{{ ticket.partner_user_name|default:"-" }}</td>
+            <td>{{ ticket.cell_no }}</td>
+            <td><span class="tag tag-issue">{{ ticket.issue }}</span></td>
+            <td>{{ ticket.received_by }}</td>
+            <td>{{ ticket.time|time:"H:i" }}</td>
+            <td>{{ ticket.forwarded_to|default:"-" }}</td>
+            <td>
+              <div class="status-dropdown">
+                <button class="status-pill status-solved" onclick="toggleStatusMenu(this, {{ ticket.sn }})">
+                  ✅ SOLVED
+                </button>
+                <div class="status-menu" id="menu-solved-{{ ticket.sn }}">
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'SOLVED')">✅ Solved</div>
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'PENDING')">⏳ Pending</div>
+                </div>
+              </div>
+            </td>
+            <td>{{ ticket.solved_at|date:"d M Y H:i"|default:"-" }}</td>
+            <td>
+              <div class="action-btns">
+                <a href="{% url 'panel_ticket_detail' ticket.sn %}" class="act-btn act-view" title="View">👁</a>
+                <a href="{% url 'panel_edit_ticket' ticket.sn %}" class="act-btn act-edit" title="Edit">✏️</a>
+                {% if request.user.is_superuser %}
+                <button class="act-btn act-delete" onclick="confirmDelete({{ ticket.sn }}, '{{ ticket.user_name|escapejs }}')" title="Delete">🗑</button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <p>No solved tickets found.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addTicketModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">🎫 Add Partner Ticket</h3>
+      <button class="modal-close" onclick="closeModal('addTicketModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'panel_add_ticket' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-grid">
+          
+          <input type="hidden" name="is_partner" value="True">
+          <div style="display:none;">{{ form.date }}</div>
+
+          <div class="form-group"><label class="form-label">Partner Name</label>{{ form.user_name }}</div>
+          <div class="form-group"><label class="form-label">User Name</label>{{ form.partner_user_name }}</div>
+          <div class="form-group"><label class="form-label">Cell Number</label>{{ form.cell_no }}</div>
+          <div class="form-group"><label class="form-label">Issue</label>{{ form.issue }}</div>
+          <div class="form-group"><label class="form-label">Received By</label>{{ form.received_by }}</div>
+          
+          <div class="form-group"><label class="form-label">Forwarded To</label>{{ form.forwarded_to }}</div>
+          <div class="form-group" id="partner_forwarded_other_wrap" style="display:none;">
+            <label class="form-label">Other Name</label>{{ form.forwarded_to_other }}
+          </div>
+
+          <div class="form-group"><label class="form-label">Status</label>{{ form.status }}</div>
+          
+          <div class="form-group full"><label class="form-label">Remark (Optional)</label>{{ form.remark }}</div>
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addTicketModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Save Ticket</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal modal-sm">
+    <div class="modal-body" style="text-align:center; padding: 32px;">
+      <div style="font-size:48px; margin-bottom:16px;">🗑️</div>
+      <h3 class="modal-del-title">Delete Ticket?</h3>
+      <p class="modal-del-msg" id="deleteMsg"></p>
+      <form method="post" id="deleteForm">
+        {% csrf_token %}
+        <div class="modal-del-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+          <button type="submit" class="btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Forwarded To Other logic for Partner Modal
+  function togglePartnerForwarded(sel) {
+    const wrap = document.getElementById('partner_forwarded_other_wrap');
+    if (wrap) {
+      wrap.style.display = sel.value === 'OTHER' ? 'block' : 'none';
+      if (sel.value !== 'OTHER') {
+        const inp = wrap.querySelector('input');
+        if (inp) inp.value = '';
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Attach listener to Forwarded To field inside the modal
+    const fwdSelect = document.querySelector('#addTicketModal select[name="forwarded_to"]');
+    if (fwdSelect) {
+      fwdSelect.addEventListener('change', function() {
+        togglePartnerForwarded(this);
+      });
+      // Initial trigger
+      togglePartnerForwarded(fwdSelect);
+    }
+
+    // Set default date to today
+    const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const dateInput = document.querySelector('#addTicketModal input[name="date"]');
+    if (dateInput && !dateInput.value) dateInput.value = today;
+  });
+
+  function confirmDelete(pk, name) {
+    document.getElementById('deleteMsg').textContent = `Are you sure you want to delete the ticket for partner "${name}"? This action cannot be undone.`;
+    document.getElementById('deleteForm').action = `/panel/tickets/delete/${pk}/`;
+    openModal('deleteModal');
+  }
+
+  function updateStatus(pk, newStatus) {
+    fetch(`/panel/tickets/status/${pk}/`, {
+      method: 'POST',
+      headers: { 
+          'Content-Type': 'application/json', 
+          'X-CSRFToken': '{{ csrf_token }}' 
+      },
+      body: JSON.stringify({ status: newStatus })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        showToast(`Status updated to ${newStatus}`);
+        setTimeout(() => location.reload(), 800);
+      } else {
+        showToast(data.error || 'Failed to update status', 'error');
+      }
+    })
+    .catch(() => showToast('Network error, failed to update status', 'error'));
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.ticket-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+    if (tab === 'solved') {
+      document.getElementById('tabSolved').classList.add('active');
+      document.getElementById('panelSolved').classList.add('active');
+    } else {
+      document.getElementById('tabActive').classList.add('active');
+      document.getElementById('panelActive').classList.add('active');
+    }
+  }
+
+  // Handle initial tab state if filtered by status
+  document.addEventListener('DOMContentLoaded', () => {
+    const statusFilter = '{{ status_filter }}';
+    if (statusFilter === 'SOLVED') {
+      switchTab('solved');
+    }
+  });
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .data-table tbody tr::before {
+      display: none !important;
+      content: none !important;
+  }
+</style>
+{% endblock %}

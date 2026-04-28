@@ -1,0 +1,319 @@
+{% extends 'panel/base.html' %}
+{% block title %}Tickets{% endblock %}
+{% block page_title %}Ticket Management{% endblock %}
+{% block page_subtitle %}{{ total_filtered }} tickets found{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openModal('addTicketModal')" id="btn-new-ticket">＋ New Ticket</button>
+<a href="{% url 'panel_export_csv' %}?date_from={{ date_from }}&date_to={{ date_to }}&status={{ status_filter }}" class="btn-outline" id="btn-export">📥 Export CSV</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="ticket-tabs" id="ticketTabs">
+  <button class="ticket-tab tab-active active" onclick="switchTab('active')" id="tabActive">
+    🔥 Active Tickets <span class="tab-badge">{{ active_count }}</span>
+  </button>
+  <button class="ticket-tab tab-solved" onclick="switchTab('solved')" id="tabSolved">
+    ✅ Solved Tickets <span class="tab-badge">{{ solved_count }}</span>
+  </button>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <form method="get" class="filters-bar" id="ticketFilters">
+    <input type="text" name="search" class="filter-input" placeholder="🔍 Search name, ID, cell..." value="{{ search }}">
+    <select name="status" class="filter-select">
+      <option value="">All Status</option>
+      {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="branch" class="filter-select">
+      <option value="">All Branches</option>
+      {% for val, label in branch_choices %}
+      <option value="{{ val }}" {% if branch_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="issue" class="filter-select">
+      <option value="">All Issues</option>
+      {% for val, label in issue_choices %}
+      <option value="{{ val }}" {% if issue_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="technician" class="filter-select">
+      <option value="">All Technicians</option>
+      {% for val, label in technician_choices %}
+      <option value="{{ val }}" {% if technician_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <input type="date" name="date_from" class="filter-input filter-date" value="{{ date_from }}">
+    <input type="date" name="date_to" class="filter-input filter-date" value="{{ date_to }}">
+    <button type="submit" class="btn-filter">Filter</button>
+    <a href="{% url 'panel_tickets' %}" class="btn-clear">✕ Clear</a>
+  </form>
+</div>
+
+<div class="tab-panel active" id="panelActive">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🔥 Active Tickets <span class="card-badge">{{ active_count }}</span></h3>
+    </div>
+    <div class="table-responsive">
+      {% if active_tickets %}
+      <table class="data-table" id="activeTicketsTable">
+        <thead>
+          <tr>
+            <th>SN</th><th>Date</th><th>User</th><th>Cust. ID</th><th>Cell No</th>
+            <th>Issue</th><th>Received By</th><th>Time</th><th>Assigned To</th>
+            <th>Branch</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in active_tickets %}
+          <tr>
+            <td class="col-sn">
+              <div class="sn-hover-card">
+                <span class="sn-trigger">#{{ ticket.sn }}</span>
+                <div class="sn-popover" hidden aria-hidden="true">
+                  <div class="sn-popover-head">
+                    <span class="sn-popover-title">Ticket #{{ ticket.sn }}</span>
+                    <span class="sn-popover-status status-{{ ticket.status|slugify }}">{{ ticket.status }}</span>
+                  </div>
+                  <div class="sn-popover-grid">
+                    <div><label>User</label><strong>{{ ticket.user_name }}</strong></div>
+                    <div><label>Customer ID</label><strong>{{ ticket.customer_id }}</strong></div>
+                    <div><label>Cell</label><strong>{{ ticket.cell_no }}</strong></div>
+                    <div><label>Issue</label><strong>{{ ticket.issue }}</strong></div>
+                    <div><label>Assigned To</label><strong>{{ ticket.technician_name|default:"-" }}</strong></div>
+                    <div><label>Branch</label><strong>{{ ticket.branch }}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ ticket.date|date:"d M Y" }}</td>
+            <td class="col-name">{{ ticket.user_name }}</td>
+            <td class="col-id">{{ ticket.customer_id }}</td>
+            <td>{{ ticket.cell_no }}</td>
+            <td><span class="tag tag-issue">{{ ticket.issue }}</span></td>
+            <td>{{ ticket.received_by }}</td>
+            <td>{{ ticket.time|time:"H:i" }}</td>
+            <td>{{ ticket.technician_name|default:"-" }}</td>
+            <td><span class="tag tag-branch">{{ ticket.branch }}</span></td>
+            <td>
+              <div class="status-dropdown">
+                <button class="status-pill status-{{ ticket.status|slugify }}" onclick="toggleStatusMenu(this, {{ ticket.sn }})">
+                  {{ ticket.status }}
+                </button>
+                <div class="status-menu" id="menu-{{ ticket.sn }}">
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'SOLVED')">✅ Solved</div>
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'PENDING')">⏳ Pending</div>
+                  <div class="status-opt" onclick="updateStatus({{ ticket.sn }}, 'TIME TAKEN')">🕐 Time Taken</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="action-btns">
+                <a href="{% url 'panel_ticket_detail' ticket.sn %}" class="act-btn act-view">👁</a>
+                <a href="{% url 'panel_edit_ticket' ticket.sn %}" class="act-btn act-edit">✏️</a>
+                {% if request.user.is_superuser %}
+                <button type="button" class="act-btn act-delete" onclick="confirmDelete({{ ticket.sn }}, '{{ ticket.user_name|escapejs }}')">🗑</button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="pagination-container" style="padding: 20px; display: flex; justify-content: center; gap: 8px;">
+        {% if active_tickets.has_previous %}
+          <a href="?page=1&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">First</a>
+          <a href="?page={{ active_tickets.previous_page_number }}&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">Prev</a>
+        {% endif %}
+        <span class="page-info" style="padding: 6px 12px; background: var(--bg2); border-radius: 4px; font-size: 13px;">
+          Page {{ active_tickets.number }} of {{ active_tickets.paginator.num_pages }}
+        </span>
+        {% if active_tickets.has_next %}
+          <a href="?page={{ active_tickets.next_page_number }}&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">Next</a>
+          <a href="?page={{ active_tickets.paginator.num_pages }}&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">Last</a>
+        {% endif %}
+      </div>
+
+      {% else %}
+      <div class="empty-state"><p>No active tickets found.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="panelSolved">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">✅ Solved Tickets <span class="card-badge">{{ solved_count }}</span></h3>
+    </div>
+    <div class="table-responsive">
+      {% if solved_tickets %}
+      <table class="data-table" id="solvedTicketsTable">
+        <thead>
+          <tr>
+            <th>SN</th><th>Date</th><th>User</th><th>User ID</th><th>Cell No</th>
+            <th>Issue</th><th>Technician</th><th>Branch</th><th>Solved At</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in solved_tickets %}
+          <tr>
+            <td class="col-sn">
+              <div class="sn-hover-card">
+                <span class="sn-trigger">#{{ ticket.sn }}</span>
+                <div class="sn-popover" hidden aria-hidden="true">
+                  <div class="sn-popover-head">
+                    <span class="sn-popover-title">Ticket #{{ ticket.sn }}</span>
+                    <span class="sn-popover-status status-{{ ticket.status|slugify }}">{{ ticket.status }}</span>
+                  </div>
+                  <div class="sn-popover-grid">
+                    <div><label>User</label><strong>{{ ticket.user_name }}</strong></div>
+                    <div><label>User ID</label><strong>{{ ticket.new_user_id|default:ticket.customer_id }}</strong></div>
+                    <div><label>Cell</label><strong>{{ ticket.cell_no }}</strong></div>
+                    <div><label>Issue</label><strong>{{ ticket.issue }}</strong></div>
+                    <div><label>Assigned To</label><strong>{{ ticket.technician_name|default:"-" }}</strong></div>
+                    <div><label>Solved At</label><strong>{{ ticket.solved_at|date:"d M Y H:i"|default:"-" }}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ ticket.date|date:"d M Y" }}</td>
+            <td class="col-name">{{ ticket.user_name }}</td>
+            <td>{{ ticket.new_user_id|default:ticket.customer_id }}</td>
+            <td>{{ ticket.cell_no }}</td>
+            <td><span class="tag tag-issue">{{ ticket.issue }}</span></td>
+            <td>{{ ticket.technician_name }}</td>
+            <td>{{ ticket.branch }}</td>
+            <td>{{ ticket.solved_at|date:"d M Y H:i" }}</td>
+            <td>
+              <div class="action-btns">
+                <a href="{% url 'panel_ticket_detail' ticket.sn %}" class="act-btn act-view">👁</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="pagination-container" style="padding: 20px; display: flex; justify-content: center; gap: 8px;">
+        {% if solved_tickets.has_previous %}
+          <a href="?solved_page=1&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">First</a>
+          <a href="?solved_page={{ solved_tickets.previous_page_number }}&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">Prev</a>
+        {% endif %}
+        <span class="page-info" style="padding: 6px 12px; background: var(--bg2); border-radius: 4px; font-size: 13px;">
+          Page {{ solved_tickets.number }} of {{ solved_tickets.paginator.num_pages }}
+        </span>
+        {% if solved_tickets.has_next %}
+          <a href="?solved_page={{ solved_tickets.next_page_number }}&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">Next</a>
+          <a href="?solved_page={{ solved_tickets.paginator.num_pages }}&search={{ search }}&status={{ status_filter }}&branch={{ branch_filter }}&issue={{ issue_filter }}&technician={{ technician_filter }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn-outline btn-sm">Last</a>
+        {% endif %}
+      </div>
+
+      {% else %}
+      <div class="empty-state"><p>No solved tickets found.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addTicketModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">🎫 Add New Ticket</h3>
+      <button class="modal-close" onclick="closeModal('addTicketModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'panel_add_ticket' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Date</label>{{ form.date }}</div>
+          <div class="form-group"><label class="form-label">Cell Number</label>{{ form.cell_no }}</div>
+          <div class="form-group"><label class="form-label">Branch</label>{{ form.branch }}</div>
+          <div class="form-group"><label class="form-label">Issue</label>{{ form.issue }}</div>
+          <div class="form-group"><label class="form-label">Received By</label>{{ form.received_by }}</div>
+          <div class="form-group"><label class="form-label">Assigned To</label>{{ form.technician_name }}</div>
+          <div class="form-group"><label class="form-label">Status</label>{{ form.status }}</div>
+          <div class="form-group full"><label class="form-label">User Name</label>{{ form.user_name }}</div>
+          <div class="form-group full"><label class="form-label">Customer ID</label>{{ form.customer_id }}</div>
+          <div class="form-group full"><label class="form-label">Remark (Optional)</label>{{ form.remark }}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addTicketModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Save Ticket</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal modal-sm">
+    <div class="modal-body" style="text-align:center; padding: 32px;">
+      <h3 class="modal-del-title">Delete Ticket?</h3>
+      <p id="deleteMsg"></p>
+      <form method="post" id="deleteForm">
+        {% csrf_token %}
+        <div class="modal-del-actions" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+          <button type="button" class="btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+          <button type="submit" class="btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Check if we should start on the Solved tab (e.g., from solved pagination)
+    if (window.location.search.includes('solved_page')) {
+        switchTab('solved');
+    }
+
+    const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const dateInput = document.querySelector('#addTicketModal input[name="date"]');
+    if (dateInput && !dateInput.value) dateInput.value = today;
+
+    // Keep date initialized for quick entry
+
+  });
+
+  function switchTab(tab) {
+    document.querySelectorAll('.ticket-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    if (tab === 'solved') {
+      document.getElementById('tabSolved').classList.add('active');
+      document.getElementById('panelSolved').classList.add('active');
+    } else {
+      document.getElementById('tabActive').classList.add('active');
+      document.getElementById('panelActive').classList.add('active');
+    }
+  }
+
+  function confirmDelete(sn, name) {
+    document.getElementById('deleteMsg').innerText = `Are you sure you want to delete ticket #${sn} for ${name}?`;
+    document.getElementById('deleteForm').action = `/panel/tickets/delete/${sn}/`;
+    openModal('deleteModal');
+  }
+
+  function updateStatus(sn, newStatus) {
+    fetch(`/panel/tickets/status/${sn}/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+      body: JSON.stringify({ status: newStatus })
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        location.reload();
+      } else {
+        alert(data.error || 'Failed to update status');
+      }
+    });
+  }
+</script>
+{% endblock %}

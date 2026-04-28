@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — FRC CMS & TICKETS</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/panel.css' %}">
+</head>
+<body class="login-page">
+  <div class="login-bg">
+    <div class="login-orb login-orb-1"></div>
+    <div class="login-orb login-orb-2"></div>
+    <div class="login-orb login-orb-3"></div>
+  </div>
+
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <div class="login-logo-icon">⚡</div>
+        </div>
+        <h1 class="login-title">FRC CMS & TICKETS</h1>
+        <p class="login-subtitle">Admin Panel · Sirajganj</p>
+      </div>
+
+      {% if messages %}
+      <div class="login-alerts">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          ❌ {{ message }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post" class="login-form" id="loginForm">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <div class="input-wrap">
+            <span class="input-icon">👤</span>
+            <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" required autofocus>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required>
+            <button type="button" class="toggle-password" onclick="togglePass()" id="togglePassBtn">👁</button>
+          </div>
+        </div>
+        <button type="submit" class="login-btn" id="loginBtn">
+          <span class="login-btn-text">Sign In</span>
+          <span class="login-btn-icon">→</span>
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <p>FRC Customer Management System</p>
+        <p class="login-footer-sub">© 2025 Sirajganj ISP · All rights reserved</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function togglePass() {
+      const p = document.getElementById('password');
+      const btn = document.getElementById('togglePassBtn');
+      if (p.type === 'password') { p.type = 'text'; btn.textContent = '🔓'; }
+      else { p.type = 'password'; btn.textContent = '👁'; }
+    }
+  </script>
+</body>
+</html>
