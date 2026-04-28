@@ -1,0 +1,45 @@
+# Core Django Dependencies
+Django==6.0.4
+asgiref==3.11.1
+sqlparse==0.5.5
+tzdata==2026.1
+typing_extensions==4.15.0
+
+# Database
+dj-database-url==3.1.2
+psycopg2-binary==2.9.11
+
+# Django Extensions & Utilities
+django-crispy-forms==2.6
+django-filter==25.2
+django-jazzmin==3.0.4
+python-decouple==3.8
+
+# Security & Authentication
+bcrypt==5.0.0
+PyJWT==2.12.1
+
+# Development & Production Server
+gunicorn==25.3.0
+whitenoise==6.12.0
+
+# Reporting & PDF Generation
+reportlab==4.4.10
+pillow==12.2.0
+
+# Date & Time Utilities
+python-dateutil==2.9.0.post0
+six==1.17.0
+
+# Additional Utilities
+blinker==1.9.0
+charset-normalizer==3.4.7
+click==8.3.2
+colorama==0.4.6
+greenlet==3.4.0
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+packaging==26.1
+Werkzeug==3.1.8
+

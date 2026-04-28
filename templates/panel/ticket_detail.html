@@ -1,0 +1,186 @@
+{% extends 'panel/base.html' %}
+{% block title %}Ticket #{{ ticket.sn }}{% endblock %}
+{% block page_title %}Ticket #{{ ticket.sn }}{% endblock %}
+{% block page_subtitle %}{{ ticket.date|date:"d M Y" }} · {{ ticket.branch }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'panel_edit_ticket' ticket.sn %}" class="btn-primary">✏️ Edit</a>
+{% if ticket.is_partner %}
+<a href="{% url 'panel_partner_tickets' %}" class="btn-outline">← Back</a>
+{% elif ticket.is_new_user %}
+<a href="{% url 'panel_new_user_tracking' %}" class="btn-outline">← Back</a>
+{% else %}
+<a href="{% url 'panel_tickets' %}" class="btn-outline">← Back</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+
+  <!-- TICKET DETAILS CARD -->
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+      <h3 class="card-title">
+        🎫 Ticket Details
+        <span class="status-pill status-{{ ticket.status|slugify }}">
+          {% if ticket.status == 'SOLVED' %}✅{% elif ticket.status == 'PENDING' %}⏳{% elif ticket.status == 'TIME TAKEN' %}🕐{% else %}🔕{% endif %}
+          {{ ticket.status }}
+        </span>
+      </h3>
+    </div>
+    <div class="card-body">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-label">Serial No</div>
+          <div class="detail-value mono accent">#{{ ticket.sn }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Date & Time</div>
+          <div class="detail-value">{{ ticket.date|date:"d M Y" }} at {{ ticket.time|time:"H:i"|default:"-" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">{% if ticket.is_partner %}Partner Name{% else %}User Name{% endif %}</div>
+          <div class="detail-value">{{ ticket.user_name }}</div>
+        </div>
+        {% if ticket.is_partner %}
+        <div class="detail-item">
+          <div class="detail-label">User Name</div>
+          <div class="detail-value">{{ ticket.partner_user_name|default:"-" }}</div>
+        </div>
+        {% endif %}
+        <div class="detail-item">
+          <div class="detail-label">Customer ID</div>
+          <div class="detail-value mono accent">{{ ticket.customer_id }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Cell Number</div>
+          <div class="detail-value">{{ ticket.cell_no }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Branch</div>
+          <div class="detail-value"><span class="tag tag-branch">{{ ticket.branch }}</span></div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Issue</div>
+          <div class="detail-value"><span class="tag tag-issue">{{ ticket.issue }}</span></div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Received By</div>
+          <div class="detail-value">{{ ticket.received_by }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Assigned To</div>
+          <div class="detail-value">{{ ticket.technician_name|default:"-" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Assigned At</div>
+          <div class="detail-value">{{ ticket.technician_assigned_at|date:"d M Y H:i"|default:"-" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Status</div>
+          <div class="detail-value">{{ ticket.status }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">New User Connection</div>
+          <div class="detail-value">{% if ticket.is_new_user %}<span class="tag tag-success">Yes</span>{% else %}-{% endif %}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">New User ID</div>
+          <div class="detail-value mono accent">{{ ticket.new_user_id|default:"-" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Solved At</div>
+          <div class="detail-value">{{ ticket.solved_at|date:"d M Y H:i"|default:"-" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Forwarded To</div>
+          <div class="detail-value">{{ ticket.forwarded_to|default:"-" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Forwarded At</div>
+          <div class="detail-value">{{ ticket.forwarded_at|date:"d M Y H:i"|default:"-" }}</div>
+        </div>
+        {% if ticket.remarks %}
+        <div class="detail-item full">
+          <div class="detail-label">Legacy Remarks</div>
+          <div class="detail-value remarks-box">{{ ticket.remarks }}</div>
+        </div>
+        {% endif %}
+        <div class="detail-item">
+          <div class="detail-label">Created</div>
+          <div class="detail-value subtle">{{ ticket.created_at|date:"d M Y H:i" }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Last Updated</div>
+          <div class="detail-value subtle">{{ ticket.updated_at|date:"d M Y H:i" }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD REMARK FORM -->
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+      <h3 class="card-title">💬 Add Remark</h3>
+    </div>
+    <div class="card-body">
+      <form method="post" action="{% url 'panel_add_remark' ticket.sn %}">
+        {% csrf_token %}
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+          <div style="flex: 0 0 180px;">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-select">
+              {% for val, label in status_choices %}
+              <option value="{{ val }}" {% if ticket.status == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="flex: 1; min-width: 250px;">
+            <label class="form-label">Remark</label>
+            <input type="text" name="remark" class="form-control" placeholder="Write your remark here..." required>
+          </div>
+          <div>
+            <button type="submit" class="btn-primary" style="white-space: nowrap;">💬 Add</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- REMARKS TIMELINE -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">📋 Remarks History <span class="card-badge">{{ remarks|length }}</span></h3>
+    </div>
+    <div class="card-body">
+      {% if remarks %}
+      <div class="remarks-timeline">
+        {% for r in remarks %}
+        <div class="remark-item">
+          <div class="remark-dot status-dot-{{ r.status|slugify }}"></div>
+          <div class="remark-content">
+            <div class="remark-header">
+              <span class="remark-status status-pill status-{{ r.status|slugify }}" style="font-size: 11px; padding: 2px 10px;">
+                {% if r.status == 'SOLVED' %}✅{% elif r.status == 'PENDING' %}⏳{% elif r.status == 'TIME TAKEN' %}🕐{% else %}🔕{% endif %}
+                {{ r.status }}
+              </span>
+              <span class="remark-meta">
+                {% if r.created_by %}by <strong>{{ r.created_by }}</strong> · {% endif %}{{ r.created_at|date:"d M Y, H:i" }}
+              </span>
+            </div>
+            <div class="remark-text">{{ r.remark }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align: center; padding: 30px; color: var(--text3);">
+        <div style="font-size: 36px; margin-bottom: 8px;">📝</div>
+        <p>No remarks yet. Add one above!</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

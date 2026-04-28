@@ -1,0 +1,219 @@
+{% extends 'panel/base.html' %}
+{% block title %}Users{% endblock %}
+{% block page_title %}User Management{% endblock %}
+{% block page_subtitle %}{{ users.count }} registered users{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openModal('addUserModal')" id="btn-add-user">＋ Add User</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">👥 All Users <span class="card-badge">{{ users.count }}</span></h3>
+  </div>
+  <div class="card-body no-pad">
+    <div class="table-responsive">
+      <table class="data-table" id="usersTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th>Last Login</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td class="col-sn">#{{ u.id }}</td>
+            <td class="col-name">
+              <div class="user-cell">
+                <div class="user-cell-avatar">{{ u.username|make_list|first|upper }}</div>
+                <span>{{ u.username }}</span>
+              </div>
+            </td>
+            <td>{{ u.get_full_name|default:"—" }}</td>
+            <td class="col-id">{{ u.email|default:"—" }}</td>
+            <td>
+              {% if u.is_superuser %}
+              <span class="tag tag-admin">Super Admin</span>
+              {% elif u.is_staff %}
+              <span class="tag tag-staff">Staff</span>
+              {% else %}
+              <span class="tag tag-user">User</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.is_active %}
+              <span class="status-pill status-solved">✅ Active</span>
+              {% else %}
+              <span class="status-pill status-no-response">🔕 Inactive</span>
+              {% endif %}
+            </td>
+            <td>{{ u.date_joined|date:"d M Y" }}</td>
+            <td>{{ u.last_login|date:"d M Y H:i"|default:"Never" }}</td>
+            <td>
+              <div class="action-btns">
+                <button class="act-btn act-edit" onclick="editUser({{ u.id }}, '{{ u.username|escapejs }}', '{{ u.first_name|escapejs }}', '{{ u.last_name|escapejs }}', '{{ u.email|escapejs }}', {{ u.is_staff|yesno:'true,false' }}, {{ u.is_superuser|yesno:'true,false' }}, {{ u.is_active|yesno:'true,false' }})" title="Edit">✏️</button>
+                {% if u != user %}
+                <button class="act-btn act-delete" onclick="deleteUser({{ u.id }}, '{{ u.username|escapejs }}')" title="Delete">🗑</button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ADD USER MODAL -->
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">👤 Add New User</h3>
+      <button class="modal-close" onclick="closeModal('addUserModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'panel_add_user' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Username *</label>
+            <input type="text" name="username" class="form-control" placeholder="Username" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password *</label>
+            <input type="password" name="password" class="form-control" placeholder="Password" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">First Name</label>
+            <input type="text" name="first_name" class="form-control" placeholder="First name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Last Name</label>
+            <input type="text" name="last_name" class="form-control" placeholder="Last name">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" placeholder="Email address">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_staff"> Staff access
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_superuser"> Super Admin
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Create User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT USER MODAL -->
+<div class="modal-overlay" id="editUserModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">✏️ Edit User — <span id="editUserTitle"></span></h3>
+      <button class="modal-close" onclick="closeModal('editUserModal')">✕</button>
+    </div>
+    <form method="post" id="editUserForm">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">First Name</label>
+            <input type="text" name="first_name" id="editFirstName" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Last Name</label>
+            <input type="text" name="last_name" id="editLastName" class="form-control">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" id="editEmail" class="form-control">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">New Password <small style="color:var(--text3);">(leave blank to keep current)</small></label>
+            <input type="password" name="password" class="form-control" placeholder="New password">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_staff" id="editIsStaff"> Staff access
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_superuser" id="editIsSuperuser"> Super Admin
+            </label>
+          </div>
+          <div class="form-group full">
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_active" id="editIsActive"> Active
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Update User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- DELETE USER MODAL -->
+<div class="modal-overlay" id="deleteUserModal">
+  <div class="modal modal-sm">
+    <div class="modal-body" style="text-align:center; padding: 32px;">
+      <div style="font-size:48px; margin-bottom:16px;">🗑️</div>
+      <h3 class="modal-del-title">Delete User?</h3>
+      <p class="modal-del-msg" id="deleteUserMsg"></p>
+      <form method="post" id="deleteUserForm">
+        {% csrf_token %}
+        <div class="modal-del-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('deleteUserModal')">Cancel</button>
+          <button type="submit" class="btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function editUser(id, username, firstName, lastName, email, isStaff, isSuperuser, isActive) {
+    document.getElementById('editUserTitle').textContent = username;
+    document.getElementById('editUserForm').action = `/panel/users/edit/${id}/`;
+    document.getElementById('editFirstName').value = firstName;
+    document.getElementById('editLastName').value = lastName;
+    document.getElementById('editEmail').value = email;
+    document.getElementById('editIsStaff').checked = isStaff;
+    document.getElementById('editIsSuperuser').checked = isSuperuser;
+    document.getElementById('editIsActive').checked = isActive;
+    openModal('editUserModal');
+  }
+
+  function deleteUser(id, username) {
+    document.getElementById('deleteUserMsg').textContent = `Are you sure you want to delete user "${username}"? This cannot be undone.`;
+    document.getElementById('deleteUserForm').action = `/panel/users/delete/${id}/`;
+    openModal('deleteUserModal');
+  }
+</script>
+{% endblock %}

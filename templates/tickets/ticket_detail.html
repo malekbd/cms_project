@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ticket #{{ ticket.sn }} — CMS</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <a href="{% url 'dashboard' %}" class="brand-logo">
+      <div class="brand-icon">🌐</div>
+      <div class="brand-text">
+        <span class="brand-name">FRC CMS & TICKETS</span>
+        <span class="brand-sub">v2.0 · SIRAJGANJ</span>
+      </div>
+    </a>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="{% url 'dashboard' %}" class="nav-link"><span class="icon">📊</span> Dashboard</a>
+  </nav>
+</aside>
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-title">Ticket #{{ ticket.sn }}</div>
+      <div class="page-subtitle">{{ ticket.date|date:"d M Y" }} · {{ ticket.branch }}</div>
+    </div>
+    <div class="topbar-right">
+      <a href="{% url 'edit_ticket' ticket.sn %}" class="btn-add" style="text-decoration:none;">✏️ Edit</a>
+      <a href="{% url 'dashboard' %}" class="btn-secondary" style="text-decoration:none; display:inline-flex; align-items:center; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; background:var(--surface2); color:var(--text2); border:1px solid var(--border);">← Back</a>
+    </div>
+  </div>
+  <div class="content">
+    <div class="panel" style="max-width: 700px; margin: 0 auto;">
+      <div class="panel-header">
+        <div class="panel-title">
+          🎫 Ticket Details
+          <span class="status-badge {{ ticket.status|slugify|cut:'-' }}" style="cursor:default;">
+            {% if ticket.status == 'SOLVED' %}✅{% elif ticket.status == 'PENDING' %}⏳{% elif ticket.status == 'TIME TAKEN' %}🕐{% else %}🔕{% endif %}
+            {{ ticket.status }}
+          </span>
+        </div>
+      </div>
+      <div style="padding: 24px;">
+        <div class="detail-grid" style="gap: 20px;">
+          <div class="detail-item"><div class="detail-label">Serial No</div><div class="detail-value" style="font-family:var(--mono); color:var(--accent2);">#{{ ticket.sn }}</div></div>
+          <div class="detail-item"><div class="detail-label">Date & Time</div><div class="detail-value">{{ ticket.date|date:"d M Y" }} at {{ ticket.time|time:"H:i" }}</div></div>
+          <div class="detail-item"><div class="detail-label">Customer Name</div><div class="detail-value">{{ ticket.user_name }}</div></div>
+          <div class="detail-item"><div class="detail-label">Customer ID</div><div class="detail-value" style="font-family:var(--mono); color:var(--accent2);">{{ ticket.customer_id }}</div></div>
+          <div class="detail-item"><div class="detail-label">Cell Number</div><div class="detail-value">{{ ticket.cell_no }}</div></div>
+          <div class="detail-item"><div class="detail-label">Branch</div><div class="detail-value">{{ ticket.branch }}</div></div>
+          <div class="detail-item"><div class="detail-label">Issue</div><div class="detail-value"><span class="issue-tag" style="font-size:14px; padding: 5px 12px;">{{ ticket.issue }}</span></div></div>
+          <div class="detail-item"><div class="detail-label">Received By</div><div class="detail-value">{{ ticket.received_by }}</div></div>
+          <div class="detail-item"><div class="detail-label">Technician</div><div class="detail-value">{{ ticket.technician_name }}</div></div>
+          <div class="detail-item"><div class="detail-label">Technician Assigned At</div><div class="detail-value">{{ ticket.technician_assigned_at|date:"d M Y H:i"|default:"-" }}</div></div>
+          <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">{{ ticket.status }}</div></div>
+          <div class="detail-item"><div class="detail-label">Solved At</div><div class="detail-value">{{ ticket.solved_at|date:"d M Y H:i"|default:"-" }}</div></div>
+          <div class="detail-item"><div class="detail-label">Forwarded To</div><div class="detail-value">{{ ticket.forwarded_to|default:"-" }}</div></div>
+          {% if ticket.remarks %}
+          <div class="detail-item" style="grid-column: 1/-1">
+            <div class="detail-label">Remarks</div>
+            <div class="detail-value" style="background:var(--surface); padding:12px; border-radius:8px; border:1px solid var(--border);">{{ ticket.remarks }}</div>
+          </div>
+          {% endif %}
+          <div class="detail-item"><div class="detail-label">Created</div><div class="detail-value" style="font-size:12px; color:var(--text3);">{{ ticket.created_at|date:"d M Y H:i" }}</div></div>
+          <div class="detail-item"><div class="detail-label">Last Updated</div><div class="detail-value" style="font-size:12px; color:var(--text3);">{{ ticket.updated_at|date:"d M Y H:i" }}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

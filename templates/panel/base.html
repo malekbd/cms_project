@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  {% load static %}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+  <title>{% block title %}Admin Panel{% endblock %} - FRC CMS & TICKETS</title>
+  <link rel="stylesheet" href="{% static 'css/panel.css' %}">
+  {% block extra_css %}{% endblock %}
+  <style>
+    .data-table tbody tr::before,
+    table tbody tr::before {
+      display: none !important;
+      content: none !important;
+    }
+  </style>
+</head>
+
+
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <a href="{% url 'panel_dashboard' %}"
+        class="brand-logo {% if panel_brand.logo_image or panel_brand.logo_url %}has-custom-logo{% endif %}">
+        {% if panel_brand.logo_image or panel_brand.logo_url %}
+        <div class="brand-image-wrap">
+          {% if panel_brand.logo_image %}
+          <img src="{{ panel_brand.logo_image }}" alt="FRC CMS & TICKETS logo" class="brand-image">
+          {% else %}
+          <img src="{{ panel_brand.logo_url }}" alt="FRC CMS & TICKETS logo" class="brand-image">
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="brand-icon">{{ panel_brand.logo_icon }}</div>
+        {% endif %}
+        <div class="brand-text">
+          <span class="brand-name">FRC CMS &amp; TICKETS</span>
+          <span class="brand-sub">{{ panel_brand.brand_subtitle }}</span>
+        </div>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-label">Navigation</div>
+        <a href="{% url 'panel_dashboard' %}" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
+          id="nav-dashboard">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard</span>
+        </a>
+        <a href="{% url 'panel_tickets' %}" class="nav-link {% if active_page == 'tickets' %}active{% endif %}"
+          id="nav-tickets">
+          <span class="nav-icon">🎫</span>
+          <span>Tickets</span>
+        </a>
+        <a href="{% url 'panel_partner_tickets' %}" class="nav-link {% if active_page == 'partners' %}active{% endif %}"
+          id="nav-partners">
+          <span class="nav-icon">🤝</span>
+          <span>Partner Tickets</span>
+        </a>
+        <a href="{% url 'panel_reports' %}" class="nav-link {% if active_page == 'reports' %}active{% endif %}"
+          id="nav-reports">
+          <span class="nav-icon">📈</span>
+          <span>Reports</span>
+        </a>
+        <a href="{% url 'panel_new_user_tracking' %}" class="nav-link {% if active_page == 'tracking' %}active{% endif %}"
+          id="nav-tracking">
+          <span class="nav-icon">👤</span>
+          <span>New Users</span>
+        </a>
+        {% if user.is_superuser %}
+        <a href="{% url 'panel_users' %}" class="nav-link {% if active_page == 'users' %}active{% endif %}"
+          id="nav-users">
+          <span class="nav-icon">👥</span>
+          <span>Users</span>
+        </a>
+        {% endif %}
+        <a href="{% url 'panel_settings' %}" class="nav-link {% if active_page == 'settings' %}active{% endif %}"
+          id="nav-settings">
+          <span class="nav-icon">⚙️</span>
+          <span>Settings</span>
+        </a>
+      </div>
+
+      {% if user.is_staff %}
+      <div class="nav-section">
+        <div class="nav-section-label">Quick Links</div>
+        <a href="{% url 'admin:index' %}" class="nav-link" target="_blank" id="nav-public">
+          <span class="nav-icon">🌐</span>
+          <span>Django Admin</span>
+          <span class="nav-external">↗</span>
+        </a>
+      </div>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-block">
+        <div class="user-avatar">{{ user.username|make_list|first|upper }}</div>
+        <div class="user-info">
+          <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+          <div class="user-role">{% if user.is_superuser %}Super Admin{% elif user.is_staff %}Staff{% else %}User{% endif %}</div>
+        </div>
+      </div>
+      <a href="{% url 'panel_logout' %}" class="logout-btn" id="logout-btn">
+        <span>🚪</span> Logout
+      </a>
+    </div>
+  </aside>
+
+  <button class="sidebar-toggle" id="sidebarToggle"
+    onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+        <p class="page-subtitle">{% block page_subtitle %}Overview{% endblock %}</p>
+      </div>
+      <form class="topbar-search" action="{% url 'panel_tickets' %}" method="get">
+        <span class="topbar-search-icon">⌕</span>
+        <input type="search" name="search" placeholder="Search tickets, customers, phone..." autocomplete="off">
+      </form>
+      <div class="topbar-right">
+        {% block topbar_actions %}{% endblock %}
+        <div class="topbar-icon-btn" id="liveTime"></div>
+        {% if user.is_staff %}
+        <a class="topbar-icon-btn" href="{% url 'admin:index' %}" target="_blank" title="Django Admin">↗</a>
+        {% endif %}
+        <div class="topbar-profile">
+          <div class="topbar-avatar">{{ user.username|make_list|first|upper }}</div>
+          <div class="topbar-user">
+            <span>{{ user.get_full_name|default:user.username }}</span>
+            <small>{% if user.is_superuser %}Super Admin{% elif user.is_staff %}Staff{% else %}User{% endif %}</small>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {% if messages %}
+    <div class="alerts-container" id="alertsContainer">
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">
+        {% if message.tags == 'success' %}✅{% elif message.tags == 'error' %}❌{% elif message.tags == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+        <span>{{ message }}</span>
+        <button class="alert-close" onclick="this.parentElement.remove()">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="page-content">
+      {% block content %}{% endblock %}
+    </div>
+
+    <footer class="panel-footer">
+      DEVELOPED BY "@TEAM_FRC" | © {% now "Y" %} FRC CMS & TICKETS. ALL RIGHTS RESERVED.
+    </footer>
+  </main>
+
+  <script src="{% static 'js/panel.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+
+</html>

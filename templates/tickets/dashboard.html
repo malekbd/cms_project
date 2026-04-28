@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CMS — ISP Support Portal</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <a href="{% url 'dashboard' %}" class="brand-logo">
+      <div class="brand-icon">🌐</div>
+      <div class="brand-text">
+        <span class="brand-name">FRC CMS & TICKETS</span>
+        <span class="brand-sub">v2.0 · SIRAJGANJ</span>
+      </div>
+    </a>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">
+      <div class="nav-section-label">Main</div>
+      <a href="{% url 'dashboard' %}" class="nav-link active">
+        <span class="icon">📊</span> Dashboard
+      </a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Status Filter</div>
+      <a href="?status=PENDING" class="nav-link"><span class="icon">⏳</span> Pending</a>
+      <a href="?status=SOLVED" class="nav-link"><span class="icon">✅</span> Solved</a>
+      <a href="?status=TIME+TAKEN" class="nav-link"><span class="icon">🕐</span> Time Taken</a>
+      <a href="?status=No+Response" class="nav-link"><span class="icon">🔕</span> No Response</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Branches</div>
+      <a href="?branch=Head+Quarter%2C+Sirajganj" class="nav-link"><span class="icon">🏢</span> HQ Sirajganj</a>
+      <a href="?branch=Ullapara" class="nav-link"><span class="icon">📍</span> Ullapara</a>
+      <a href="?branch=Shahzadpur" class="nav-link"><span class="icon">📍</span> Shahzadpur</a>
+      <a href="?branch=Tarash" class="nav-link"><span class="icon">📍</span> Tarash</a>
+      <a href="?branch=Raiganj" class="nav-link"><span class="icon">📍</span> Raiganj</a>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="company-name">FRC CMS & TICKETS</div>
+    <div class="company-info">Sirajganj, Bangladesh</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-title">Support Tickets</div>
+      <div class="page-subtitle">Customer Management System</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-add" onclick="openModal('addModal')">
+        ＋ New Ticket
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ALERTS -->
+    {% if messages %}
+    <div id="alertsContainer">
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">
+        {% if message.tags == 'success' %}✅{% else %}❌{% endif %}
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- STATS -->
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <div class="stat-label">Total Tickets</div>
+        <div class="stat-value">{{ total }}</div>
+        <div class="stat-icon">🎫</div>
+      </div>
+      <div class="stat-card solved">
+        <div class="stat-label">Solved</div>
+        <div class="stat-value">{{ solved }}</div>
+        <div class="stat-icon">✅</div>
+      </div>
+      <div class="stat-card pending">
+        <div class="stat-label">Pending</div>
+        <div class="stat-value">{{ pending }}</div>
+        <div class="stat-icon">⏳</div>
+      </div>
+      <div class="stat-card timetaken">
+        <div class="stat-label">Time Taken</div>
+        <div class="stat-value">{{ time_taken }}</div>
+        <div class="stat-icon">🕐</div>
+      </div>
+      <div class="stat-card noresponse">
+        <div class="stat-label">No Response</div>
+        <div class="stat-value">{{ no_response }}</div>
+        <div class="stat-icon">🔕</div>
+      </div>
+      <div class="stat-card today">
+        <div class="stat-label">Today</div>
+        <div class="stat-value">{{ today_count }}</div>
+        <div class="stat-icon">📅</div>
+      </div>
+    </div>
+
+    <!-- PANELS -->
+    <div class="panels-grid">
+      <!-- TICKETS TABLE -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            🎫 All Tickets
+            <span class="panel-badge">{{ tickets.count }}</span>
+          </div>
+        </div>
+
+        <!-- FILTERS -->
+        <form method="get" class="filters-bar">
+          <input type="text" name="search" class="filter-input" placeholder="🔍 Search name, ID, cell, issue..." value="{{ search }}">
+          <select name="status" class="filter-select">
+            <option value="">All Status</option>
+            <option value="SOLVED" {% if status_filter == 'SOLVED' %}selected{% endif %}>Solved</option>
+            <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>Pending</option>
+            <option value="TIME TAKEN" {% if status_filter == 'TIME TAKEN' %}selected{% endif %}>Time Taken</option>
+            <option value="No Response" {% if status_filter == 'No Response' %}selected{% endif %}>No Response</option>
+          </select>
+          <select name="branch" class="filter-select">
+            <option value="">All Branches</option>
+            <option value="Head Quarter, Sirajganj">HQ Sirajganj</option>
+            <option value="Ullapara">Ullapara</option>
+            <option value="Shahzadpur">Shahzadpur</option>
+            <option value="Tarash">Tarash</option>
+            <option value="Raiganj">Raiganj</option>
+            <option value="Kodda">Kodda</option>
+            <option value="Belkuchi">Belkuchi</option>
+            <option value="Kamarkhanda">Kamarkhanda</option>
+            <option value="Pipulbaria">Pipulbaria</option>
+            <option value="Enayetpur">Enayetpur</option>
+            <option value="Chandaikona">Chandaikona</option>
+          </select>
+          <input type="date" name="date_from" class="filter-input" style="min-width:130px" value="{{ date_from }}" title="From date">
+          <input type="date" name="date_to" class="filter-input" style="min-width:130px" value="{{ date_to }}" title="To date">
+          <button type="submit" class="filter-btn">Filter</button>
+          <a href="{% url 'dashboard' %}" class="filter-btn clear">✕ Clear</a>
+        </form>
+
+        <!-- TABLE -->
+        <div class="table-wrap">
+          {% if tickets %}
+          <table>
+            <thead>
+              <tr>
+                <th>SN</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Cust. ID</th>
+                <th>Cell No</th>
+                <th>Issue</th>
+                <th>Received By</th>
+                <th>Time</th>
+                <th>Technician</th>
+                <th>Assigned At</th>
+                <th>Status</th>
+                <th>Solved At</th>
+                <th>Forwarded To</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ticket in tickets %}
+              <tr>
+                <td class="sn">#{{ ticket.sn }}</td>
+                <td>{{ ticket.date|date:"d M Y" }}</td>
+                <td class="name">{{ ticket.user_name }}</td>
+                <td class="cid">{{ ticket.customer_id }}</td>
+                <td>{{ ticket.cell_no }}</td>
+                <td><span class="issue-tag">{{ ticket.issue }}</span></td>
+                <td>{{ ticket.received_by }}</td>
+                <td>{{ ticket.time|time:"H:i" }}</td>
+                <td>{{ ticket.technician_name }}</td>
+                <td>{{ ticket.technician_assigned_at|date:"d M Y H:i"|default:"-" }}</td>
+                <td>
+                  <div class="status-dropdown">
+                    <button class="status-badge {{ ticket.status|slugify|cut:'-' }}" onclick="toggleStatusMenu(this, {{ ticket.sn }})">
+                      {% if ticket.status == 'SOLVED' %}✅{% elif ticket.status == 'PENDING' %}⏳{% elif ticket.status == 'TIME TAKEN' %}🕐{% else %}🔕{% endif %}
+                      {{ ticket.status }}
+                    </button>
+                    <div class="status-menu" id="menu-{{ ticket.sn }}">
+                      <div class="status-menu-item" onclick="updateStatus({{ ticket.sn }}, 'SOLVED')">✅ Solved</div>
+                      <div class="status-menu-item" onclick="updateStatus({{ ticket.sn }}, 'PENDING')">⏳ Pending</div>
+                      <div class="status-menu-item" onclick="updateStatus({{ ticket.sn }}, 'TIME TAKEN')">🕐 Time Taken</div>
+                      <div class="status-menu-item" onclick="updateStatus({{ ticket.sn }}, 'No Response')">🔕 No Response</div>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ ticket.solved_at|date:"d M Y H:i"|default:"-" }}</td>
+                <td>{{ ticket.forwarded_to|default:"-" }}</td>
+                <td>
+                  <div class="action-btns">
+                    <a href="{% url 'ticket_detail' ticket.sn %}" class="btn-sm btn-view">👁</a>
+                    <a href="{% url 'edit_ticket' ticket.sn %}" class="btn-sm btn-edit">✏️</a>
+                    <button class="btn-sm btn-delete" onclick="confirmDelete({{ ticket.sn }}, '{{ ticket.user_name|escapejs }}')">🗑</button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">
+            <div class="icon">📭</div>
+            <p>No tickets found. Try adjusting your filters.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- CHART PANEL -->
+      <div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="panel-header">
+            <div class="panel-title">📊 Top Issues</div>
+          </div>
+          <div class="chart-container" id="issueChart">
+            <!-- populated by JS -->
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">⚡ Quick Stats</div>
+          </div>
+          <div style="padding: 16px;">
+            {% if total > 0 %}
+            <div class="chart-bar-item">
+              <div class="chart-bar-label">
+                <span class="chart-bar-name">✅ Solve Rate</span>
+                <span class="chart-bar-count">{% widthratio solved total 100 %}%</span>
+              </div>
+              <div class="chart-bar-track">
+                <div class="chart-bar-fill" style="width: {% widthratio solved total 100 %}%; background: linear-gradient(90deg, #10b981, #34d399);"></div>
+              </div>
+            </div>
+            <div class="chart-bar-item">
+              <div class="chart-bar-label">
+                <span class="chart-bar-name">⏳ Pending Rate</span>
+                <span class="chart-bar-count">{% widthratio pending total 100 %}%</span>
+              </div>
+              <div class="chart-bar-track">
+                <div class="chart-bar-fill" style="width: {% widthratio pending total 100 %}%; background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+              </div>
+            </div>
+            <div class="chart-bar-item">
+              <div class="chart-bar-label">
+                <span class="chart-bar-name">🔕 No Response Rate</span>
+                <span class="chart-bar-count">{% widthratio no_response total 100 %}%</span>
+              </div>
+              <div class="chart-bar-track">
+                <div class="chart-bar-fill" style="width: {% widthratio no_response total 100 %}%; background: linear-gradient(90deg, #ef4444, #f87171);"></div>
+              </div>
+            </div>
+            {% else %}
+            <p style="color: var(--text3); font-size: 13px; text-align: center; padding: 20px 0;">No data yet</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<!-- ADD TICKET MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🎫 Add New Ticket</div>
+      <button class="modal-close" onclick="closeModal('addModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'add_ticket' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            {{ form.date }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Customer Name</label>
+            {{ form.user_name }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Customer ID</label>
+            {{ form.customer_id }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cell Number</label>
+            {{ form.cell_no }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Branch</label>
+            {{ form.branch }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Issue</label>
+            {{ form.issue }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Received By</label>
+            {{ form.received_by }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Technician</label>
+            {{ form.technician_name }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            {{ form.status }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Forwarded To</label>
+            {{ form.forwarded_to }}
+          </div>
+          <div class="form-group" id="forwarded_other_wrap" style="display:none;">
+            <label class="form-label">Other Name</label>
+            {{ form.forwarded_to_other }}
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Remarks</label>
+            {{ form.remarks }}
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Save Ticket</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-body" style="text-align:center; padding: 32px;">
+      <div style="font-size:48px; margin-bottom:16px;">🗑️</div>
+      <h3 style="font-size:18px; margin-bottom:8px;">Delete Ticket?</h3>
+      <p style="color:var(--text2); font-size:13px; margin-bottom:24px;" id="deleteMsg"></p>
+      <form method="post" id="deleteForm">
+        {% csrf_token %}
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button type="button" class="btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+          <button type="submit" class="btn-primary" style="background:var(--red);">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/main.js' %}"></script>
+<script>
+// Issue chart from Django data
+const issueData = {{ issue_stats|safe }};
+const maxCount = issueData.length > 0 ? Math.max(...issueData.map(d => d.count)) : 1;
+const chartEl = document.getElementById('issueChart');
+if (issueData.length === 0) {
+  chartEl.innerHTML = '<p style="color:var(--text3); font-size:13px; text-align:center; padding:20px;">No data yet</p>';
+} else {
+  chartEl.innerHTML = issueData.map(d => `
+    <div class="chart-bar-item">
+      <div class="chart-bar-label">
+        <span class="chart-bar-name">${d.issue}</span>
+        <span class="chart-bar-count">${d.count}</span>
+      </div>
+      <div class="chart-bar-track">
+        <div class="chart-bar-fill" style="width:${(d.count/maxCount*100).toFixed(1)}%"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Set today's date as default
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+  const dateInput = document.querySelector('#addModal input[name="date"]');
+  if (dateInput && !dateInput.value) dateInput.value = today;
+  const timeInput = document.querySelector('#addModal input[name="time"]');
+  if (timeInput && !timeInput.value) {
+    const now = new Date();
+    timeInput.value = now.toTimeString().slice(0,5);
+  }
+  // Auto-dismiss alerts
+  setTimeout(() => {
+    const alerts = document.getElementById('alertsContainer');
+    if (alerts) alerts.style.opacity = '0', alerts.style.transition = '0.5s', setTimeout(() => alerts.remove(), 500);
+  }, 4000);
+
+  // Init forwarded-to OTHER field visibility
+  document.querySelectorAll('select[name="forwarded_to"]').forEach(sel => toggleForwardedOther(sel));
+});
+
+function toggleForwardedOther(sel) {
+  const wrap = sel.closest('.form-grid, .form-body, form').querySelector('#forwarded_other_wrap, [id$="forwarded_other_wrap"]');
+  if (wrap) {
+    wrap.style.display = sel.value === 'OTHER' ? '' : 'none';
+    if (sel.value !== 'OTHER') {
+      const inp = wrap.querySelector('input');
+      if (inp) inp.value = '';
+    }
+  }
+}
+</script>
+</body>
+</html>

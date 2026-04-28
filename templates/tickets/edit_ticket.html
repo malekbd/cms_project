@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Ticket #{{ ticket.sn }} — CMS</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <a href="{% url 'dashboard' %}" class="brand-logo">
+      <div class="brand-icon">🌐</div>
+      <div class="brand-text">
+        <span class="brand-name">FRC CMS & TICKETS</span>
+        <span class="brand-sub">v2.0 · SIRAJGANJ</span>
+      </div>
+    </a>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">
+      <a href="{% url 'dashboard' %}" class="nav-link"><span class="icon">📊</span> Dashboard</a>
+    </div>
+  </nav>
+</aside>
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-title">Edit Ticket #{{ ticket.sn }}</div>
+      <div class="page-subtitle">{{ ticket.user_name }} · {{ ticket.issue }}</div>
+    </div>
+    <div class="topbar-right">
+      <a href="{% url 'dashboard' %}" class="btn-secondary" style="text-decoration:none; display:inline-flex; align-items:center; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600;">← Back</a>
+    </div>
+  </div>
+  <div class="content">
+    <div class="panel" style="max-width: 700px; margin: 0 auto;">
+      <div class="panel-header">
+        <div class="panel-title">✏️ Update Ticket Information</div>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Date</label>{{ form.date }}</div>
+            <div class="form-group"><label class="form-label">Time</label>{{ form.time }}</div>
+            <div class="form-group"><label class="form-label">Customer Name</label>{{ form.user_name }}</div>
+            <div class="form-group"><label class="form-label">Customer ID</label>{{ form.customer_id }}</div>
+            <div class="form-group"><label class="form-label">Cell Number</label>{{ form.cell_no }}</div>
+            <div class="form-group"><label class="form-label">Branch</label>{{ form.branch }}</div>
+            <div class="form-group"><label class="form-label">Issue</label>{{ form.issue }}</div>
+            <div class="form-group"><label class="form-label">Received By</label>{{ form.received_by }}</div>
+            <div class="form-group"><label class="form-label">Technician</label>{{ form.technician_name }}</div>
+            <div class="form-group"><label class="form-label">Technician Assigned At</label>{{ form.technician_assigned_at }}</div>
+            <div class="form-group"><label class="form-label">Status</label>{{ form.status }}</div>
+            <div class="form-group"><label class="form-label">Solved At</label>{{ form.solved_at }}</div>
+            <div class="form-group"><label class="form-label">Forwarded To</label>{{ form.forwarded_to }}</div>
+            <div class="form-group" id="forwarded_other_wrap" style="display:none;"><label class="form-label">Other Name</label>{{ form.forwarded_to_other }}</div>
+            <div class="form-group full"><label class="form-label">Remarks</label>{{ form.remarks }}</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <a href="{% url 'dashboard' %}" class="btn-secondary" style="text-decoration:none; display:inline-flex; align-items:center; padding:10px 22px; border-radius:8px;">Cancel</a>
+          <button type="submit" class="btn-primary">💾 Update Ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+<script>
+function toggleForwardedOther(sel) {
+  const wrap = document.getElementById('forwarded_other_wrap');
+  if (wrap) {
+    wrap.style.display = sel.value === 'OTHER' ? '' : 'none';
+    if (sel.value !== 'OTHER') {
+      const inp = wrap.querySelector('input');
+      if (inp) inp.value = '';
+    }
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.querySelector('select[name="forwarded_to"]');
+  if (sel) toggleForwardedOther(sel);
+});
+</script>
+</body>
+</html>

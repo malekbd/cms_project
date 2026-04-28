@@ -1,0 +1,348 @@
+{% extends 'panel/base.html' %}
+{% block title %}New User Tracking{% endblock %}
+{% block page_title %}New User Tracking{% endblock %}
+{% block page_subtitle %}Yearly creation tracking with branch-wise performance{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-primary" onclick="openModal('addNewUserTicketModal')" id="btn-new-user-ticket">＋ New User Ticket</button>
+{% endblock %}
+
+{% block content %}
+<div class="ticket-tabs" id="newUserTabs" style="margin-bottom: 20px;">
+  <button class="ticket-tab tab-active active" type="button" onclick="switchNewUserTab('active')" id="newUserTabActive">
+    Active New User Tickets <span class="tab-badge">{{ active_new_user_count }}</span>
+  </button>
+  <button class="ticket-tab tab-solved" type="button" onclick="switchNewUserTab('solved')" id="newUserTabSolved">
+    Solved New User Tickets <span class="tab-badge">{{ solved_new_user_count }}</span>
+  </button>
+</div>
+
+<div class="tab-panel active" id="newUserPanelActive">
+  <div class="card tracking-table-card" style="margin-bottom: 24px;">
+    <div class="card-header">
+      <h3 class="card-title">Active New User Tickets <span class="card-badge">{{ active_new_user_count }}</span></h3>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table tracking-data-table">
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Date</th>
+            <th>User</th>
+            <th>Customer ID</th>
+            <th>Cell No</th>
+            <th>Branch</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in active_new_user_tickets %}
+          <tr>
+            <td class="col-sn">
+              <div class="sn-hover-card">
+                <a href="{% url 'panel_ticket_detail' ticket.sn %}" class="sn-trigger">#{{ ticket.sn }}</a>
+                <div class="sn-popover" hidden aria-hidden="true">
+                  <div class="sn-popover-head">
+                    <span class="sn-popover-title">Ticket #{{ ticket.sn }}</span>
+                    <span class="sn-popover-status status-{{ ticket.status|slugify }}">{{ ticket.status }}</span>
+                  </div>
+                  <div class="sn-popover-grid">
+                    <div><label>User</label><strong>{{ ticket.user_name }}</strong></div>
+                    <div><label>Customer ID</label><strong>{{ ticket.customer_id }}</strong></div>
+                    <div><label>Cell</label><strong>{{ ticket.cell_no }}</strong></div>
+                    <div><label>Issue</label><strong>{{ ticket.issue }}</strong></div>
+                    <div><label>Assigned To</label><strong>{{ ticket.technician_name|default:"-" }}</strong></div>
+                    <div><label>Branch</label><strong>{{ ticket.branch }}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ ticket.date|date:"d M Y" }}</td>
+            <td class="col-name">{{ ticket.user_name }}</td>
+            <td>{{ ticket.customer_id }}</td>
+            <td>{{ ticket.cell_no }}</td>
+            <td>{{ ticket.branch }}</td>
+            <td>
+              <div class="tracking-status-actions">
+                <span class="tracking-table-percentage {% if ticket.status == 'PENDING' %}tracking-table-percentage-warning{% else %}tracking-table-percentage-critical{% endif %}">{{ ticket.status }}</span>
+                {% if request.user.is_superuser %}
+                <button type="button" class="act-btn act-delete tracking-delete-btn" onclick="confirmDelete({{ ticket.sn }}, '{{ ticket.user_name|escapejs }}')" title="Delete ticket" aria-label="Delete ticket #{{ ticket.sn }}">&#128465;</button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" style="text-align:center; color: var(--text3); padding:24px;">No active new user tickets found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="newUserPanelSolved">
+  <div class="card tracking-table-card" style="margin-bottom: 24px;">
+    <div class="card-header">
+      <h3 class="card-title">Solved New User Tickets <span class="card-badge">{{ solved_new_user_count }}</span></h3>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table tracking-data-table">
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Date</th>
+            <th>User</th>
+            <th>Customer ID</th>
+            <th>Cell No</th>
+            <th>Branch</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in solved_new_user_tickets %}
+          <tr>
+            <td class="col-sn">
+              <div class="sn-hover-card">
+                <a href="{% url 'panel_ticket_detail' ticket.sn %}" class="sn-trigger">#{{ ticket.sn }}</a>
+                <div class="sn-popover" hidden aria-hidden="true">
+                  <div class="sn-popover-head">
+                    <span class="sn-popover-title">Ticket #{{ ticket.sn }}</span>
+                    <span class="sn-popover-status status-{{ ticket.status|slugify }}">{{ ticket.status }}</span>
+                  </div>
+                  <div class="sn-popover-grid">
+                    <div><label>User</label><strong>{{ ticket.user_name }}</strong></div>
+                    <div><label>Customer ID</label><strong>{{ ticket.customer_id }}</strong></div>
+                    <div><label>Issue</label><strong>{{ ticket.issue }}</strong></div>
+                    <div><label>Assigned To</label><strong>{{ ticket.technician_name|default:"-" }}</strong></div>
+                    <div><label>Branch</label><strong>{{ ticket.branch }}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ ticket.date|date:"d M Y" }}</td>
+            <td class="col-name">{{ ticket.user_name }}</td>
+            <td>{{ ticket.customer_id }}</td>
+            <td>{{ ticket.cell_no }}</td>
+            <td>{{ ticket.branch }}</td>
+            <td><span class="tracking-table-percentage tracking-table-percentage-good">{{ ticket.status }}</span></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" style="text-align:center; color: var(--text3); padding:24px;">No solved new user tickets found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<section class="tracking-hero">
+  <div>
+    <span class="tracking-kicker">Yearly Monitoring</span>
+    <h2 class="tracking-heading">Track created users by year, branch, and monthly pace.</h2>
+    <p class="tracking-description">
+      This view counts only solved tickets marked as new-user connections with a valid user ID, so branch performance
+      stays tied to real created users.
+    </p>
+  </div>
+  <div class="tracking-summary-grid">
+    <div class="tracking-summary-card">
+      <span class="tracking-summary-label">Total New Users</span>
+      <span class="tracking-summary-value">{{ total_new_users }}</span>
+      <span class="tracking-summary-meta">For {{ selected_year }}{% if selected_branch %} in {{ selected_branch }}{% endif %}</span>
+    </div>
+    <div class="tracking-summary-card">
+      <span class="tracking-summary-label">Active Branches</span>
+      <span class="tracking-summary-value">{{ active_branch_count }}</span>
+      <span class="tracking-summary-meta">Branches with at least one created user</span>
+    </div>
+    <div class="tracking-summary-card">
+      <span class="tracking-summary-label">Monthly Average</span>
+      <span class="tracking-summary-value">{{ monthly_average }}</span>
+      <span class="tracking-summary-meta">Average created users per month</span>
+    </div>
+    <div class="tracking-summary-card">
+      <span class="tracking-summary-label">Top Branch</span>
+      <span class="tracking-summary-value">{% if top_branch %}{{ top_branch.achieved }}{% else %}0{% endif %}</span>
+      <span class="tracking-summary-meta">{% if top_branch %}{{ top_branch.branch_name }}{% else %}No branch data yet{% endif %}</span>
+    </div>
+  </div>
+</section>
+
+<div class="tracking-period-bar">
+  <form method="get" class="tracking-form-grid tracking-form-grid-compact" style="width: 100%;">
+    <div class="report-filter-group">
+      <label class="form-label">Year</label>
+      <select name="year" class="filter-select">
+        {% for year in available_years %}
+        <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="report-filter-group">
+      <label class="form-label">Branch</label>
+      <select name="branch" class="filter-select">
+        <option value="">All Branches</option>
+        {% for value, label in branch_choices %}
+        <option value="{{ value }}" {% if selected_branch == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="tracking-form-actions">
+      <button type="submit" class="btn-primary" style="width: 100%;">Apply Filter</button>
+    </div>
+  </form>
+  <div class="tracking-period-meta">
+    <span>{{ current_month_label }} pace included</span>
+    <span>{{ branch_performance|length }} configured branches</span>
+  </div>
+</div>
+
+<div class="tracking-command-grid">
+  <div class="card tracking-form-card">
+    <div class="card-header">
+      <h3 class="card-title">Monthly New Users</h3>
+    </div>
+    <div class="card-body">
+      <div class="chart-area" id="trackingMonthlyChart"></div>
+    </div>
+  </div>
+  <div class="card tracking-form-card">
+    <div class="card-header">
+      <h3 class="card-title">Top Branches</h3>
+    </div>
+    <div class="card-body">
+      <div class="bar-chart" id="trackingBranchChart"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card tracking-table-card">
+  <div class="card-header">
+    <h3 class="card-title">Branch-wise Yearly Performance</h3>
+  </div>
+  <div class="table-responsive">
+    <table class="data-table tracking-data-table">
+      <thead>
+        <tr>
+          <th>Branch</th>
+          <th>Yearly Total</th>
+          <th>This Month</th>
+          <th>Monthly Target</th>
+          <th>Annual Target</th>
+          <th>Remaining</th>
+          <th>Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in branch_performance %}
+        <tr>
+          <td class="col-name">{{ item.branch_name }}</td>
+          <td>{{ item.achieved }}</td>
+          <td>{{ item.this_month }}</td>
+          <td>{{ item.monthly_target }}</td>
+          <td>{{ item.annual_target }}</td>
+          <td>{{ item.remaining }}</td>
+          <td>
+            <span class="tracking-table-percentage {% if item.progress >= 100 %}tracking-table-percentage-good{% elif item.progress >= 50 %}tracking-table-percentage-warning{% else %}tracking-table-percentage-critical{% endif %}">
+              {{ item.progress }}%
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" style="text-align:center; color: var(--text3); padding:24px;">No branch data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addNewUserTicketModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Add New User Ticket</h3>
+      <button class="modal-close" onclick="closeModal('addNewUserTicketModal')">✕</button>
+    </div>
+    <form method="post" action="{% url 'panel_add_ticket' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Date</label>{{ form.date }}</div>
+          <div class="form-group"><label class="form-label">Cell Number</label>{{ form.cell_no }}</div>
+          <div class="form-group"><label class="form-label">Branch</label>{{ form.branch }}</div>
+          <div class="form-group"><label class="form-label">Received By</label>{{ form.received_by }}</div>
+          <div class="form-group"><label class="form-label">Assigned To</label>{{ form.technician_name }}</div>
+          <div class="form-group"><label class="form-label">Issue</label>{{ form.issue }}</div>
+          <div class="form-group"><label class="form-label">Status</label>{{ form.status }}</div>
+          <input type="hidden" name="is_new_user" value="on">
+          <div class="form-group full"><label class="form-label">User Name</label>{{ form.user_name }}</div>
+          <div class="form-group full"><label class="form-label">Customer ID</label>{{ form.customer_id }}</div>
+          <div class="form-group full"><label class="form-label">Remark (Optional)</label>{{ form.remark }}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('addNewUserTicketModal')">Cancel</button>
+        <button type="submit" class="btn-primary">💾 Save Ticket</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if request.user.is_superuser %}
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal modal-sm">
+    <div class="modal-body" style="text-align:center; padding: 32px;">
+      <h3 class="modal-del-title">Delete New User Ticket?</h3>
+      <p class="modal-del-msg" id="deleteMsg"></p>
+      <form method="post" id="deleteForm">
+        {% csrf_token %}
+        <div class="modal-del-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+          <button type="submit" class="btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const trackingMonthlyLabels = {{ monthly_labels|safe }};
+  const trackingMonthlyValues = {{ monthly_values|safe }};
+  const trackingBranchLabels = {{ branch_chart_labels|safe }};
+  const trackingBranchValues = {{ branch_chart_values|safe }};
+
+  renderBarChart('trackingMonthlyChart', trackingMonthlyLabels, trackingMonthlyValues, '#06b6d4', true);
+  renderHorizontalBars(
+    'trackingBranchChart',
+    trackingBranchLabels.map((label, index) => ({ label, value: trackingBranchValues[index] || 0 })),
+    '#8b5cf6'
+  );
+
+  function switchNewUserTab(tab) {
+    document.getElementById('newUserTabActive').classList.toggle('active', tab === 'active');
+    document.getElementById('newUserTabSolved').classList.toggle('active', tab === 'solved');
+    document.getElementById('newUserPanelActive').classList.toggle('active', tab === 'active');
+    document.getElementById('newUserPanelSolved').classList.toggle('active', tab === 'solved');
+  }
+
+  function confirmDelete(sn, name) {
+    const deleteMsg = document.getElementById('deleteMsg');
+    const deleteForm = document.getElementById('deleteForm');
+    if (!deleteMsg || !deleteForm) return;
+
+    deleteMsg.textContent = `Are you sure you want to delete new user ticket #${sn} for "${name || 'Unknown'}"? This action cannot be undone.`;
+    deleteForm.action = `/panel/tickets/delete/${sn}/`;
+    openModal('deleteModal');
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const dateInput = document.querySelector('#addNewUserTicketModal input[name="date"]');
+    if (dateInput && !dateInput.value) dateInput.value = today;
+
+  });
+</script>
+{% endblock %}

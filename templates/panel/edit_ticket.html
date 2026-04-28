@@ -1,0 +1,143 @@
+{% extends 'panel/base.html' %}
+{% block title %}Edit Ticket #{{ ticket.sn }}{% endblock %}
+{% block page_title %}Edit Ticket #{{ ticket.sn }}{% endblock %}
+{% block page_subtitle %}{{ ticket.user_name }} · {{ ticket.issue }}{% endblock %}
+
+{% block topbar_actions %}
+{% if ticket.is_partner %}
+<a href="{% url 'panel_partner_tickets' %}" class="btn-outline">← Back to Partner Tickets</a>
+{% elif ticket.is_new_user %}
+<a href="{% url 'panel_new_user_tracking' %}" class="btn-outline">← Back to New Users</a>
+{% else %}
+<a href="{% url 'panel_tickets' %}" class="btn-outline">← Back to Tickets</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 750px; margin: 0 auto;">
+  <div class="card-header">
+    <h3 class="card-title">✏️ Update Ticket Information</h3>
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <div class="card-body">
+      <div class="form-grid">
+        
+        {% if ticket.is_partner %}
+          <input type="hidden" name="is_partner" value="True">
+          <div class="form-group"><label class="form-label">Date</label>{{ form.date }}</div>
+          <div class="form-group"><label class="form-label">Partner Name</label>{{ form.user_name }}</div>
+          <div class="form-group"><label class="form-label">User Name</label>{{ form.partner_user_name }}</div>
+          <div class="form-group"><label class="form-label">Cell Number</label>{{ form.cell_no }}</div>
+          <div class="form-group"><label class="form-label">Issue</label>{{ form.issue }}</div>
+          <div class="form-group"><label class="form-label">Received By</label>{{ form.received_by }}</div>
+          
+          <div class="form-group"><label class="form-label">Forwarded To</label>{{ form.forwarded_to }}</div>
+          <div class="form-group" id="forwarded_other_wrap" style="display:none;"><label class="form-label">Other Name</label>{{ form.forwarded_to_other }}</div>
+          
+          <div class="form-group"><label class="form-label">Status</label>{{ form.status }}</div>
+          <div class="form-group full"><label class="form-label">Remark (Optional)</label>{{ form.remark }}</div>
+
+        {% else %}
+          <div class="form-group"><label class="form-label">Date</label>{{ form.date }}</div>
+          <div class="form-group"><label class="form-label">Cell Number</label>{{ form.cell_no }}</div>
+          <div class="form-group"><label class="form-label">Branch</label>{{ form.branch }}</div>
+          <div class="form-group"><label class="form-label">Issue</label>{{ form.issue }}</div>
+          <div class="form-group"><label class="form-label">Received By</label>{{ form.received_by }}</div>
+          <div class="form-group"><label class="form-label">Assigned To</label>{{ form.technician_name }}</div>
+          <div class="form-group"><label class="form-label">Status</label>{{ form.status }}</div>
+          
+          <div class="form-group full">
+            <label class="checkbox-label new-user-checkbox" style="display:flex; align-items:center; gap:8px;">
+              {{ form.is_new_user }} <strong>Is this a New User Connection?</strong>
+            </label>
+          </div>
+          <div class="form-group full"><label class="form-label">User Name</label>{{ form.user_name }}</div>
+          <div class="form-group full"><label class="form-label">Customer ID</label>{{ form.customer_id }}</div>
+          
+          <div class="form-group"><label class="form-label">Forwarded To</label>{{ form.forwarded_to }}</div>
+          <div class="form-group" id="forwarded_other_wrap" style="display:none;"><label class="form-label">Other Name</label>{{ form.forwarded_to_other }}</div>
+          
+          <div class="form-group full"><label class="form-label">Remark (Optional)</label>{{ form.remark }}</div>
+          
+          <div class="form-group full" style="display: none;">
+            {{ form.is_partner }}
+          </div>
+        {% endif %}
+
+      </div>
+
+      <div style="margin-top: 16px; padding: 12px 16px; background: rgba(99, 102, 241, 0.08); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15);">
+        <div style="font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 8px;">⏱ Managed Timestamps</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 13px; color: var(--text2);">
+          <div>📞 <strong>Time:</strong> {{ ticket.time|time:"H:i" }}</div>
+          {% if not ticket.is_partner %}
+            <div>🔧 <strong>Assigned At:</strong> {{ ticket.technician_assigned_at|date:"d M Y H:i"|default:"Not yet assigned" }}</div>
+          {% endif %}
+          <div>✅ <strong>Solved At:</strong> {{ ticket.solved_at|date:"d M Y H:i"|default:"Not yet solved" }}</div>
+          <div>↗️ <strong>Forwarded At:</strong> {{ ticket.forwarded_at|date:"d M Y H:i"|default:"Not forwarded" }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer">
+      {% if ticket.is_partner %}
+      <a href="{% url 'panel_partner_tickets' %}" class="btn-secondary">Cancel</a>
+      {% elif ticket.is_new_user %}
+      <a href="{% url 'panel_new_user_tracking' %}" class="btn-secondary">Cancel</a>
+      {% else %}
+      <a href="{% url 'panel_tickets' %}" class="btn-secondary">Cancel</a>
+      {% endif %}
+      <button type="submit" class="btn-primary">💾 Update Ticket</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/**
+ * Toggles the visibility of the 'Forwarded To Other' input field.
+ */
+function toggleForwardedOther(sel) {
+  const wrap = document.getElementById('forwarded_other_wrap');
+  if (wrap) {
+    wrap.style.display = sel.value === 'OTHER' ? 'block' : 'none';
+    if (sel.value !== 'OTHER') {
+      const inp = wrap.querySelector('input');
+      if (inp) inp.value = '';
+    }
+  }
+}
+
+/**
+ * Keeps Customer ID prominent for new user tickets.
+ */
+function toggleNewUserId(input) {
+  const form = input.closest('form');
+  if (!form) return;
+
+  const statusSelect = form.querySelector('select[name="status"]');
+  return input.checked && statusSelect && statusSelect.value === 'SOLVED';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize Forwarded To logic
+  const fwdSelect = document.querySelector('select[name="forwarded_to"]');
+  if (fwdSelect) {
+    toggleForwardedOther(fwdSelect);
+    fwdSelect.addEventListener('change', function() { toggleForwardedOther(this); });
+  }
+  
+  // Initialize New User logic (if field exists in standard view)
+  const newUserCheckbox = document.querySelector('input[name="is_new_user"]');
+  if (newUserCheckbox) {
+    toggleNewUserId(newUserCheckbox);
+    newUserCheckbox.addEventListener('change', function() { toggleNewUserId(this); });
+    const statusSelect = document.querySelector('select[name="status"]');
+    if (statusSelect) {
+      statusSelect.addEventListener('change', function() { toggleNewUserId(newUserCheckbox); });
+    }
+  }
+});
+</script>
+{% endblock %}
