@@ -214,7 +214,8 @@ class Ticket(models.Model):
     def save(self, *args, **kwargs):
         # Auto-set time to now if not provided (new ticket)
         if not self.time:
-            self.time = timezone.now().time()
+            # ---> FIX APPLIED HERE: কনভার্ট করে লোকাল টাইম সেভ করা হচ্ছে <---
+            self.time = timezone.localtime(timezone.now()).time()
 
         is_new = self.pk is None
 
