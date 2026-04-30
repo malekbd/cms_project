@@ -9,6 +9,12 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/wsgi/
 
 import os
 
+# Apply security patch before Django loads any apps
+try:
+    from .security_patch import *
+except ImportError:
+    pass  # Patch not available, continue anyway
+
 from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cms_project.settings')

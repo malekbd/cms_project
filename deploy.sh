@@ -98,9 +98,33 @@ create_backup() {
     # Backup database
     if command -v pg_dump &> /dev/null; then
         DB_NAME=$(grep -o "DB_NAME=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
+        DB_USER=$(grep -o "DB_USER=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
+        DB_HOST=$(grep -o "DB_HOST=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
+        DB_PORT=$(grep -o "DB_PORT=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
+        
         if [ -n "$DB_NAME" ]; then
-            pg_dump "$DB_NAME" > "$BACKUP_DIR/db_backup_$TIMESTAMP.sql"
-            log "Database backup created: $BACKUP_DIR/db_backup_$TIMESTAMP.sql"
+            # Build pg_dump command with connection parameters
+            PG_DUMP_CMD="pg_dump"
+            [ -n "$DB_USER" ] && PG_DUMP_CMD="$PG_DUMP_CMD -U $DB_USER"
+            [ -n "$DB_HOST" ] && PG_DUMP_CMD="$PG_DUMP_CMD -h $DB_HOST"
+            [ -n "$DB_PORT" ] && PG_DUMP_CMD="$PG_DUMP_CMD -p $DB_PORT"
+            
+            # Set PGPASSWORD if DB_PASSWORD is available
+            DB_PASSWORD=$(grep -o "DB_PASSWORD=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
+            if [ -n "$DB_PASSWORD" ]; then
+                export PGPASSWORD="$DB_PASSWORD"
+            fi
+            
+            if $PG_DUMP_CMD "$DB_NAME" > "$BACKUP_DIR/db_backup_$TIMESTAMP.sql" 2>/dev/null; then
+                log "Database backup created: $BACKUP_DIR/db_backup_$TIMESTAMP.sql"
+            else
+                warn "Database backup failed. Continuing without backup."
+                # Remove empty backup file
+                rm -f "$BACKUP_DIR/db_backup_$TIMESTAMP.sql"
+            fi
+            
+            # Unset PGPASSWORD
+            unset PGPASSWORD 2>/dev/null || true
         fi
     fi
     
@@ -226,20 +250,37 @@ run_health_checks() {
     cd "$PROJECT_DIR"
     source "$VENV_DIR/bin/activate"
     
-    # Run Django health check
-    if python -c "import requests; r = requests.get('http://localhost:8000/health/', timeout=5); print('Health check:', r.status_code)" 2>/dev/null; then
-        log "Health check passed"
-    else
-        warn "Health check failed or endpoint not configured"
-    fi
-    
-    # Check database connection
+    # Check database connection using Django's check command
+    log "Checking database connection..."
     if python manage.py check --database default 2>/dev/null; then
         log "Database connection check passed"
     else
         error "Database connection check failed"
+        # Try to get more details
+        python manage.py check --database default 2>&1 | head -20
         exit 1
     fi
+    
+    # Check if services are running
+    log "Checking service status..."
+    if systemctl is-active --quiet cms.service; then
+        log "CMS service is running"
+        
+        # Try to call health endpoint via curl if available
+        if command -v curl &> /dev/null; then
+            if curl -f -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8000/health/ 2>/dev/null | grep -q "200"; then
+                log "Health endpoint responded with 200 OK"
+            else
+                warn "Health endpoint not responding with 200 OK (service might still be starting)"
+            fi
+        else
+            warn "curl not available, skipping health endpoint check"
+        fi
+    else
+        warn "CMS service is not running (may be normal during deployment)"
+    fi
+    
+    log "Health checks completed"
 }
 
 # Function to setup deployment directory structure
@@ -276,8 +317,10 @@ switch_deployment() {
     log "Switching to new deployment..."
     
     # Update current symlink atomically
-    ln -sfn "$DEPLOYMENTS_DIR/$DEPLOYMENT_ID" "$CURRENT_LINK.tmp"
-    mv -f "$CURRENT_LINK.tmp" "$CURRENT_LINK"
+    # Use a temporary file in /tmp to avoid conflict with symlink resolution
+    TMP_LINK="/tmp/cms_current_$DEPLOYMENT_ID.tmp"
+    ln -sfn "$DEPLOYMENTS_DIR/$DEPLOYMENT_ID" "$TMP_LINK"
+    mv -f "$TMP_LINK" "$CURRENT_LINK"
     
     log "Deployment switched to $DEPLOYMENT_ID"
 }
@@ -297,8 +340,9 @@ rollback_deployment() {
     log "Rolling back to deployment: $PREVIOUS_DEPLOYMENT"
     
     # Switch to previous deployment
-    ln -sfn "$DEPLOYMENTS_DIR/$PREVIOUS_DEPLOYMENT" "$CURRENT_LINK.tmp"
-    mv -f "$CURRENT_LINK.tmp" "$CURRENT_LINK"
+    TMP_LINK="/tmp/cms_current_rollback_$PREVIOUS_DEPLOYMENT.tmp"
+    ln -sfn "$DEPLOYMENTS_DIR/$PREVIOUS_DEPLOYMENT" "$TMP_LINK"
+    mv -f "$TMP_LINK" "$CURRENT_LINK"
     
     # Restart services
     restart_services

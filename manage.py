@@ -3,6 +3,12 @@
 import os
 import sys
 
+# Apply security patch before Django loads any apps
+try:
+    from cms_project.security_patch import *
+except ImportError:
+    pass  # Patch not available, continue anyway
+
 
 def main():
     """Run administrative tasks."""
