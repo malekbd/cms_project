@@ -1,0 +1,64 @@
+[Unit]
+Description=CMS Django Application
+After=network.target postgresql.service redis-server.service
+Requires=postgresql.service
+Wants=redis-server.service
+
+[Service]
+Type=notify
+User=cmsuser
+Group=cmsuser
+WorkingDirectory=/home/cmsuser/cms_project
+Environment="PATH=/home/cmsuser/cms_project/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=cms_project.settings"
+Environment="PYTHONPATH=/home/cmsuser/cms_project"
+Environment="PYTHONUNBUFFERED=1"
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
+ReadOnlyPaths=/home/cmsuser/cms_project
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Process management
+ExecStart=/home/cmsuser/cms_project/venv/bin/gunicorn \
+    --config /home/cmsuser/cms_project/gunicorn.conf.py \
+    cms_project.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=65536
+LimitMEMLOCK=infinity
+LimitSTACK=8388608
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cms
+SyslogFacility=daemon
+SyslogLevel=info
+
+# Notify systemd when ready
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target

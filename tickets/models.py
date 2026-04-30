@@ -177,6 +177,11 @@ class Ticket(models.Model):
             models.Index(fields=['cell_no']),
             models.Index(fields=['technician_name']),
             models.Index(fields=['branch']),
+            models.Index(fields=['status']),
+            models.Index(fields=['date']),
+            models.Index(fields=['branch', 'status']),
+            models.Index(fields=['is_partner']),
+            models.Index(fields=['created_at']),
         ]
 
     def __init__(self, *args, **kwargs):
@@ -267,3 +272,52 @@ class TicketRemark(models.Model):
 
     def __str__(self):
         return f"Remark on #{self.ticket_id} [{self.status}] - {self.remark[:50]}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AUDIT LOGGING (security and compliance)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class AuditLog(models.Model):
+    """
+    Audit trail for security-sensitive actions.
+    Records user actions for compliance and security monitoring.
+    """
+    ACTION_CHOICES = [
+        ('login', 'User Login'),
+        ('logout', 'User Logout'),
+        ('user_create', 'User Created'),
+        ('user_update', 'User Updated'),
+        ('user_delete', 'User Deleted'),
+        ('ticket_create', 'Ticket Created'),
+        ('ticket_update', 'Ticket Updated'),
+        ('ticket_delete', 'Ticket Deleted'),
+        ('config_change', 'Configuration Changed'),
+        ('permission_change', 'Permission Changed'),
+        ('password_change', 'Password Changed'),
+        ('failed_login', 'Failed Login Attempt'),
+        ('sensitive_access', 'Sensitive Data Access'),
+        ('export', 'Data Export'),
+        ('import', 'Data Import'),
+        ('other', 'Other Action'),
+    ]
+    
+    user = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Audit Log'
+        verbose_name_plural = 'Audit Logs'
+        indexes = [
+            models.Index(fields=['user', 'timestamp']),
+            models.Index(fields=['action', 'timestamp']),
+            models.Index(fields=['ip_address', 'timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_action_display()} by {self.user.username if self.user else 'System'} at {self.timestamp}"

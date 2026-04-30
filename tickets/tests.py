@@ -3,6 +3,8 @@ from datetime import date, timedelta, time
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
+from django.http import Http404
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -13,6 +15,7 @@ from tickets.forms import TicketForm
 from tickets.models import (
     BranchOption,
     IssueType,
+    PanelBrandSettings,
     PartnerOption,
     ReceivedByOption,
     TechnicianOption,
@@ -28,6 +31,8 @@ from tickets.panel_views import (
     get_user_branch_scope,
     normalize_key,
 )
+from tickets.context_processors import panel_branding
+from tickets.seed_config import seed, main
 
 
 class BaseTicketTestCase(TestCase):
@@ -132,6 +137,103 @@ class TicketModelTest(BaseTicketTestCase):
         self.assertEqual(get_ticket_panel_route(partner), 'panel_partner_tickets')
         self.assertEqual(get_ticket_panel_route(new_user), 'panel_new_user_tracking')
 
+    def test_ticket_get_latest_remark(self):
+        ticket = self.create_ticket(customer_id='CUST999')
+        # No remarks initially
+        self.assertIsNone(ticket.get_latest_remark())
+        # Add a remark
+        remark = TicketRemark.objects.create(
+            ticket=ticket,
+            status='SOLVED',
+            remark='Test remark',
+            created_by='test_user'
+        )
+        self.assertEqual(ticket.get_latest_remark(), remark)
+        # Add another remark, first should still be latest? Actually .first() returns earliest created?
+        # Since ordering is -created_at, first() returns most recent.
+        remark2 = TicketRemark.objects.create(
+            ticket=ticket,
+            status='PENDING',
+            remark='Second remark',
+            created_by='test_user'
+        )
+        self.assertEqual(ticket.get_latest_remark(), remark2)
+
+    def test_ticket_forwarded_at_auto_set(self):
+        """Test that forwarded_at is set when forwarded_to is assigned."""
+        ticket = self.create_ticket(customer_id='CUST888')
+        self.assertIsNone(ticket.forwarded_at)
+        # Assign forwarded_to for the first time
+        ticket.forwarded_to = 'SOMEONE'
+        ticket.save()
+        self.assertIsNotNone(ticket.forwarded_at)
+        forwarded_at = ticket.forwarded_at
+        # Changing forwarded_to to a different value should update forwarded_at
+        ticket.forwarded_to = 'SOMEONE ELSE'
+        ticket.save()
+        # forwarded_at may be the same second, but should still be a datetime
+        self.assertIsNotNone(ticket.forwarded_at)
+        # Clearing forwarded_to should reset forwarded_at
+        ticket.forwarded_to = ''
+        ticket.save()
+        self.assertIsNone(ticket.forwarded_at)
+
+    def test_ticket_remark_str(self):
+        ticket = self.create_ticket(customer_id='CUST777')
+        remark_text = 'This is a test remark that is longer than fifty characters to test truncation'
+        remark = TicketRemark.objects.create(
+            ticket=ticket,
+            status='SOLVED',
+            remark=remark_text,
+            created_by='test_user'
+        )
+        expected = f"Remark on #{ticket.sn} [SOLVED] - {remark_text[:50]}"
+        self.assertEqual(str(remark), expected)
+        # Test short remark
+        remark2 = TicketRemark.objects.create(
+            ticket=ticket,
+            status='PENDING',
+            remark='Short',
+            created_by='test_user'
+        )
+        self.assertEqual(str(remark2), f"Remark on #{ticket.sn} [PENDING] - Short")
+
+
+class ConfigModelTest(BaseTicketTestCase):
+    """Test cases for config models (IssueType, ReceivedByOption, etc.)."""
+
+    def setUp(self):
+        self.create_options()
+
+    def test_issue_type_str(self):
+        self.assertEqual(str(self.issue_type), 'Internet Connection Issue')
+
+    def test_issue_type_get_active_choices(self):
+        choices = IssueType.get_active_choices()
+        self.assertEqual(len(choices), 1)
+        self.assertEqual(choices[0], ('internet_issue', 'Internet Connection Issue'))
+
+    def test_received_by_option_str(self):
+        self.assertEqual(str(self.received_by), 'Support Desk')
+
+    def test_technician_option_str(self):
+        self.assertEqual(str(self.technician), 'Technician 1')
+
+    def test_branch_option_str(self):
+        self.assertEqual(str(self.branch), 'Head Quarter')
+
+    def test_partner_option_str(self):
+        self.assertEqual(str(self.partner), 'Partner One')
+
+    def test_panel_brand_settings_str(self):
+        brand = PanelBrandSettings.objects.create(
+            brand_name='Test Brand',
+            brand_subtitle='Subtitle',
+            logo_icon='★',
+            logo_url='https://example.com',
+        )
+        self.assertEqual(str(brand), 'Test Brand')
+
 
 class TicketFormTest(BaseTicketTestCase):
     """Test cases for the TicketForm."""
@@ -170,6 +272,23 @@ class TicketFormTest(BaseTicketTestCase):
         form = TicketForm(data=self.base_form_data(customer_id='cust001'))
         self.assertFalse(form.is_valid())
         self.assertIn('customer_id', form.errors)
+
+    def test_clean_customer_id_validation(self):
+        """Directly test clean_customer_id method raises ValidationError."""
+        form = TicketForm()
+        # Simulate cleaned_data with invalid customer ID
+        form.cleaned_data = {'customer_id': 'cust001'}
+        with self.assertRaises(ValidationError) as cm:
+            form.clean_customer_id()
+        self.assertIn('Customer ID must use uppercase letters', str(cm.exception))
+        # Test valid customer ID
+        form.cleaned_data = {'customer_id': 'CUST001'}
+        result = form.clean_customer_id()
+        self.assertEqual(result, 'CUST001')
+        # Test empty customer ID (should return empty string)
+        form.cleaned_data = {'customer_id': ''}
+        result = form.clean_customer_id()
+        self.assertEqual(result, '')
 
     def test_form_future_date_validation(self):
         form = TicketForm(data=self.base_form_data(date=date.today() + timedelta(days=1)))
@@ -248,6 +367,98 @@ class TicketFormTest(BaseTicketTestCase):
             is_partner='True',
         ), initial={'is_partner': True})
         self.assertTrue(form.is_valid(), form.errors)
+
+    def test_customer_id_validation_regex(self):
+        """Test that customer ID must match uppercase pattern."""
+        # Invalid: starts with lowercase
+        form = TicketForm(data=self.base_form_data(customer_id='cust001'))
+        self.assertFalse(form.is_valid())
+        self.assertIn('customer_id', form.errors)
+        # Invalid: contains special character not allowed
+        form = TicketForm(data=self.base_form_data(customer_id='CUST@001'))
+        self.assertFalse(form.is_valid())
+        self.assertIn('customer_id', form.errors)
+        # Valid: uppercase with hyphen
+        form = TicketForm(data=self.base_form_data(customer_id='CUST-001'))
+        self.assertTrue(form.is_valid(), form.errors)
+        # Valid: uppercase with underscore
+        form = TicketForm(data=self.base_form_data(customer_id='CUST_001'))
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_phone_number_normalization(self):
+        """Test that phone numbers starting with +880 or 88 are normalized."""
+        # +880 prefix
+        form = TicketForm(data=self.base_form_data(cell_no='+8801712345678'))
+        self.assertTrue(form.is_valid(), form.errors)
+        # After cleaning, cell_no should be '01712345678' (strip +880)
+        self.assertEqual(form.cleaned_data['cell_no'], '01712345678')
+        # 88 prefix
+        form = TicketForm(data=self.base_form_data(cell_no='8801712345678'))
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['cell_no'], '01712345678')
+        # No prefix unchanged
+        form = TicketForm(data=self.base_form_data(cell_no='01712345678'))
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['cell_no'], '01712345678')
+
+    def test_forwarded_to_other_validation(self):
+        """Test that forwarded_to='OTHER' requires forwarded_to_other."""
+        form = TicketForm(data=self.base_form_data(
+            forwarded_to='OTHER',
+            forwarded_to_other='',
+        ))
+        self.assertFalse(form.is_valid())
+        self.assertIn('forwarded_to_other', form.errors)
+        # With value, should be valid
+        form = TicketForm(data=self.base_form_data(
+            forwarded_to='OTHER',
+            forwarded_to_other='Some Other',
+        ))
+        self.assertTrue(form.is_valid(), form.errors)
+        # Check that forwarded_to is replaced with the other value
+        self.assertEqual(form.cleaned_data['forwarded_to'], 'SOME OTHER')
+
+    def test_partner_validation_missing_fields(self):
+        """Test that partner tickets require user_name, partner_user_name, issue."""
+        # Missing user_name
+        form = TicketForm(data=self.base_form_data(
+            user_name='',
+            partner_user_name='Partner User',
+            customer_id='',
+            branch='',
+            is_partner='True',
+            issue='',
+        ), initial={'is_partner': True})
+        self.assertFalse(form.is_valid())
+        self.assertIn('user_name', form.errors)
+        # Missing partner_user_name (already covered in existing test)
+        # Missing issue
+        form = TicketForm(data=self.base_form_data(
+            user_name='partner_one',
+            partner_user_name='Partner User',
+            customer_id='',
+            branch='',
+            is_partner='True',
+            issue='',
+        ), initial={'is_partner': True})
+        self.assertFalse(form.is_valid())
+        self.assertIn('issue', form.errors)
+
+    def test_existing_user_validation_missing_fields(self):
+        """Test that existing user tickets require user_name, customer_id, issue."""
+        # Ensure is_new_user=False (default) and is_partner=False
+        data = self.base_form_data(
+            user_name='',
+            customer_id='',
+            issue='',
+            is_new_user='',
+            is_partner='',
+        )
+        form = TicketForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('user_name', form.errors)
+        self.assertIn('customer_id', form.errors)
+        self.assertIn('issue', form.errors)
 
 
 class TicketViewTest(BaseTicketTestCase):
@@ -781,6 +992,149 @@ class MiddlewareTest(TestCase):
         with self.assertRaises(RuntimeError):
             ErrorHandlingMiddleware(get_response)(request)
 
+    def test_error_handling_middleware_validation_error_json(self):
+        """ValidationError with Accept: application/json returns JSON response."""
+        def get_response(request):
+            from django.core.exceptions import ValidationError
+            raise ValidationError('Invalid data')
+
+        request = self.factory.get('/')
+        request.META['HTTP_ACCEPT'] = 'application/json'
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, ValidationError('Invalid data'))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        data = json.loads(response.content)
+        self.assertEqual(data['error'], 'Validation Error')
+
+    def test_error_handling_middleware_validation_error_no_json(self):
+        """ValidationError without JSON returns None (Django handles)."""
+        def get_response(request):
+            from django.core.exceptions import ValidationError
+            raise ValidationError('Invalid data')
+
+        request = self.factory.get('/')
+        if 'HTTP_ACCEPT' in request.META:
+            del request.META['HTTP_ACCEPT']
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, ValidationError('Invalid data'))
+        self.assertIsNone(response)
+
+    def test_error_handling_middleware_database_error_json(self):
+        """DatabaseError with JSON returns JSON response."""
+        def get_response(request):
+            from django.db import DatabaseError
+            raise DatabaseError('DB broken')
+
+        request = self.factory.get('/')
+        request.META['HTTP_ACCEPT'] = 'application/json'
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, DatabaseError('DB broken'))
+        self.assertEqual(response.status_code, 500)
+        data = json.loads(response.content)
+        self.assertEqual(data['error'], 'Database Error')
+
+    def test_error_handling_middleware_http404_json(self):
+        """Http404 with JSON returns JSON response."""
+        def get_response(request):
+            from django.http import Http404
+            raise Http404('Not found')
+
+        request = self.factory.get('/')
+        request.META['HTTP_ACCEPT'] = 'application/json'
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, Http404('Not found'))
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertEqual(data['error'], 'Not Found')
+
+    @override_settings(DEBUG=False)
+    def test_error_handling_middleware_generic_error_json(self):
+        """Generic exception with JSON and DEBUG=False returns JSON."""
+        def get_response(request):
+            raise RuntimeError('Something went wrong')
+
+        request = self.factory.get('/')
+        request.META['HTTP_ACCEPT'] = 'application/json'
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, RuntimeError('Something went wrong'))
+        self.assertEqual(response.status_code, 500)
+        data = json.loads(response.content)
+        self.assertEqual(data['error'], 'Internal Server Error')
+
+    @override_settings(DEBUG=True)
+    def test_error_handling_middleware_generic_error_debug_true(self):
+        """Generic exception with DEBUG=True returns None (debug page)."""
+        def get_response(request):
+            raise RuntimeError('Something went wrong')
+
+        request = self.factory.get('/')
+        request.META['HTTP_ACCEPT'] = 'application/json'
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, RuntimeError('Something went wrong'))
+        self.assertIsNone(response)
+
+    def test_error_handling_middleware_database_error_no_json(self):
+        """DatabaseError without JSON returns None."""
+        def get_response(request):
+            from django.db import DatabaseError
+            raise DatabaseError('DB broken')
+
+        request = self.factory.get('/')
+        if 'HTTP_ACCEPT' in request.META:
+            del request.META['HTTP_ACCEPT']
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, DatabaseError('DB broken'))
+        self.assertIsNone(response)
+
+    def test_error_handling_middleware_http404_no_json(self):
+        """Http404 without JSON returns None."""
+        def get_response(request):
+            from django.http import Http404
+            raise Http404('Not found')
+
+        request = self.factory.get('/')
+        if 'HTTP_ACCEPT' in request.META:
+            del request.META['HTTP_ACCEPT']
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, Http404('Not found'))
+        self.assertIsNone(response)
+
+    @override_settings(DEBUG=False)
+    def test_error_handling_middleware_generic_error_no_json(self):
+        """Generic exception without JSON and DEBUG=False returns None."""
+        def get_response(request):
+            raise RuntimeError('Something went wrong')
+
+        request = self.factory.get('/')
+        if 'HTTP_ACCEPT' in request.META:
+            del request.META['HTTP_ACCEPT']
+        middleware = ErrorHandlingMiddleware(get_response)
+        response = middleware.process_exception(request, RuntimeError('Something went wrong'))
+        self.assertIsNone(response)
+
+    @override_settings(DEBUG=False)
+    def test_security_headers_middleware_hsts(self):
+        """HSTS header added when DEBUG=False."""
+        def get_response(request):
+            from django.http import HttpResponse
+            return HttpResponse('ok')
+
+        request = self.factory.get('/')
+        response = SecurityHeadersMiddleware(get_response)(request)
+        self.assertIn('Strict-Transport-Security', response.headers)
+
+    @override_settings(DEBUG=True)
+    def test_security_headers_middleware_no_hsts_debug(self):
+        """HSTS header omitted when DEBUG=True."""
+        def get_response(request):
+            from django.http import HttpResponse
+            return HttpResponse('ok')
+
+        request = self.factory.get('/')
+        response = SecurityHeadersMiddleware(get_response)(request)
+        self.assertNotIn('Strict-Transport-Security', response.headers)
+
 
 class ReportingAIAgentTest(TestCase):
     def test_ai_agent_empty_report(self):
@@ -836,6 +1190,206 @@ class ReportingAIAgentTest(TestCase):
         )
         self.assertIsInstance(result, dict)
         self.assertIn('health', result)
+
+    def test_ai_agent_high_no_response(self):
+        """Trigger no_response_pct > 20 condition."""
+        agent = ReportingAIAgent()
+        result = agent.analyze(
+            total=10,
+            solved=5,
+            pending=3,
+            time_taken=0,
+            no_response=3,  # 30%
+            solve_rate=50,
+            tech_report=[],
+            branch_report=[],
+            issue_report=[],
+            daily_values=[1, 2, 3],
+        )
+        self.assertIsInstance(result, dict)
+        self.assertIn('insights', result)
+        # Check that the insight about high no-response is present
+        insights = '\n'.join(result['insights'])
+        self.assertIn('no-response', insights.lower())
+
+    def test_ai_agent_recent_volume_rising(self):
+        """Trigger recent_avg > overall_avg * 1.2."""
+        agent = ReportingAIAgent()
+        result = agent.analyze(
+            total=10,
+            solved=5,
+            pending=3,
+            time_taken=0,
+            no_response=0,
+            solve_rate=50,
+            tech_report=[],
+            branch_report=[],
+            issue_report=[],
+            daily_values=[1, 1, 1, 5, 5, 5],  # recent three [5,5,5] avg 5, overall avg ~3
+        )
+        self.assertIsInstance(result, dict)
+        self.assertIn('insights', result)
+        insights = '\n'.join(result['insights'])
+        self.assertIn('rising', insights.lower())
+
+    def test_ai_agent_recent_volume_lower(self):
+        """Trigger recent_avg < overall_avg * 0.8."""
+        agent = ReportingAIAgent()
+        result = agent.analyze(
+            total=10,
+            solved=5,
+            pending=3,
+            time_taken=0,
+            no_response=0,
+            solve_rate=50,
+            tech_report=[],
+            branch_report=[],
+            issue_report=[],
+            daily_values=[5, 5, 5, 1, 1, 1],  # recent three [1,1,1] avg 1, overall avg ~3
+        )
+        self.assertIsInstance(result, dict)
+        self.assertIn('insights', result)
+        insights = '\n'.join(result['insights'])
+        self.assertIn('lower', insights.lower())
+
+    def test_ai_agent_warning_health(self):
+        """Trigger solve_rate between 60 and 80 (warning)."""
+        agent = ReportingAIAgent()
+        result = agent.analyze(
+            total=10,
+            solved=7,
+            pending=2,
+            time_taken=0,
+            no_response=0,
+            solve_rate=70,
+            tech_report=[],
+            branch_report=[],
+            issue_report=[],
+            daily_values=[1, 2, 3],
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['health'], 'warning')
+        self.assertIn('recommendations', result)
+
+    def test_ai_agent_no_recommendations(self):
+        """Trigger empty recommendations list (should add default)."""
+        agent = ReportingAIAgent()
+        result = agent.analyze(
+            total=10,
+            solved=9,
+            pending=1,
+            time_taken=0,
+            no_response=0,
+            solve_rate=90,
+            tech_report=[],
+            branch_report=[],
+            issue_report=[],
+            daily_values=[1, 1, 1],
+        )
+        self.assertIsInstance(result, dict)
+        self.assertIn('recommendations', result)
+        # Should have at least one recommendation (the default)
+        self.assertGreater(len(result['recommendations']), 0)
+
+
+class ContextProcessorTest(TestCase):
+    def test_panel_branding_without_settings(self):
+        """panel_branding returns default brand when no PanelBrandSettings exists."""
+        request = RequestFactory().get('/')
+        result = panel_branding(request)
+        self.assertEqual(result, {'panel_brand': {
+            'brand_name': 'FRC CMS & TICKETS',
+            'brand_subtitle': 'ADMIN PANEL',
+            'logo_icon': '⚡',
+            'logo_url': '',
+        }})
+
+    def test_panel_branding_with_settings(self):
+        """panel_branding returns custom brand when PanelBrandSettings exists."""
+        settings = PanelBrandSettings.objects.create(
+            brand_name='Custom Brand',
+            brand_subtitle='Custom Subtitle',
+            logo_icon='★',
+            logo_url='https://example.com',
+        )
+        request = RequestFactory().get('/')
+        result = panel_branding(request)
+        self.assertEqual(result['panel_brand']['brand_name'], 'Custom Brand')
+        self.assertEqual(result['panel_brand']['brand_subtitle'], 'Custom Subtitle')
+        self.assertEqual(result['panel_brand']['logo_icon'], '★')
+        self.assertEqual(result['panel_brand']['logo_url'], 'https://example.com')
+        # logo_image should be empty string because no image uploaded
+        self.assertEqual(result['panel_brand']['logo_image'], '')
+
+
+class SeedConfigTest(TestCase):
+    def test_seed_function_creates_new_objects(self):
+        """seed creates objects that don't exist."""
+        from tickets.models import IssueType
+        # Ensure no IssueType objects exist
+        IssueType.objects.all().delete()
+        data = [('test1', 'Test 1'), ('test2', 'Test 2')]
+        # Call seed
+        seed(IssueType, data, "Test")
+        # Verify objects created
+        self.assertEqual(IssueType.objects.count(), 2)
+        obj1 = IssueType.objects.get(name='test1')
+        self.assertEqual(obj1.display_name, 'Test 1')
+        self.assertEqual(obj1.sort_order, 0)
+        obj2 = IssueType.objects.get(name='test2')
+        self.assertEqual(obj2.sort_order, 1)
+
+    def test_seed_function_skips_existing_objects(self):
+        """seed does not duplicate existing objects."""
+        from tickets.models import IssueType
+        IssueType.objects.all().delete()
+        # Create one object beforehand
+        IssueType.objects.create(name='test1', display_name='Existing', sort_order=99)
+        data = [('test1', 'Test 1'), ('test2', 'Test 2')]
+        seed(IssueType, data, "Test")
+        # Should have created only test2
+        self.assertEqual(IssueType.objects.count(), 2)
+        obj1 = IssueType.objects.get(name='test1')
+        # display_name should remain unchanged (since get_or_create uses defaults only if created)
+        self.assertEqual(obj1.display_name, 'Existing')
+        self.assertEqual(obj1.sort_order, 99)
+        obj2 = IssueType.objects.get(name='test2')
+        self.assertEqual(obj2.display_name, 'Test 2')
+        self.assertEqual(obj2.sort_order, 1)
+
+    def test_main_function(self):
+        """main() runs without error and seeds all config tables."""
+        # Ensure tables are empty
+        from tickets.models import IssueType, ReceivedByOption, TechnicianOption, BranchOption
+        IssueType.objects.all().delete()
+        ReceivedByOption.objects.all().delete()
+        TechnicianOption.objects.all().delete()
+        BranchOption.objects.all().delete()
+        # Call main
+        main()
+        # Verify that some objects were created (at least one per table)
+        self.assertGreater(IssueType.objects.count(), 0)
+        self.assertGreater(ReceivedByOption.objects.count(), 0)
+        self.assertGreater(TechnicianOption.objects.count(), 0)
+        self.assertGreater(BranchOption.objects.count(), 0)
+
+    def test_script_as_main(self):
+        """Running the script as __main__ executes the guard."""
+        import runpy
+        # This will execute the if __name__ == "__main__": block
+        # We need to ensure the database is clean to avoid duplicate entries
+        from tickets.models import IssueType, ReceivedByOption, TechnicianOption, BranchOption
+        IssueType.objects.all().delete()
+        ReceivedByOption.objects.all().delete()
+        TechnicianOption.objects.all().delete()
+        BranchOption.objects.all().delete()
+        # Run the module as __main__
+        runpy.run_module('tickets.seed_config', run_name='__main__')
+        # Verify that objects were created
+        self.assertGreater(IssueType.objects.count(), 0)
+        self.assertGreater(ReceivedByOption.objects.count(), 0)
+        self.assertGreater(TechnicianOption.objects.count(), 0)
+        self.assertGreater(BranchOption.objects.count(), 0)
 
 
 class URLSmokeTest(TestCase):

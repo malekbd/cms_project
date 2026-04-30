@@ -79,9 +79,14 @@ def seed(Model, data, label):
     print(f"  {label}: {created} created, {len(data) - created} already existed")
 
 
-print("Seeding configuration options...")
-seed(IssueType, ISSUES, "Issue Types")
-seed(ReceivedByOption, RECEIVED_BY, "Received By")
-seed(TechnicianOption, TECHNICIANS, "Technicians")
-seed(BranchOption, BRANCHES, "Branches")
-print("Done!")
+def main():
+    print("Seeding configuration options...")
+    seed(IssueType, ISSUES, "Issue Types")
+    seed(ReceivedByOption, RECEIVED_BY, "Received By")
+    seed(TechnicianOption, TECHNICIANS, "Technicians")
+    seed(BranchOption, BRANCHES, "Branches")
+    print("Done!")
+
+
+if __name__ == "__main__":
+    main()

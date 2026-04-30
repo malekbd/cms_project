@@ -64,7 +64,3 @@ python-dotenv==1.0.1  # Added for environment management
 redis==5.2.1  # Added for Redis client
 celery==5.4.0  # Added for task queue (optional)
 django-celery-results==2.6.0  # Added for Celery results (optional)
-
-# API & Documentation
-djangorestframework==3.16.2
-drf-spectacular==0.28.0

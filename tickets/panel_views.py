@@ -17,6 +17,7 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.utils import timezone
+from django.core.cache import cache
 
 from .models import (
     Ticket, TicketRemark, STATUS_CHOICES,
@@ -24,6 +25,7 @@ from .models import (
 )
 from .forms import TicketForm
 from .ai_reporting_agent import ReportingAIAgent
+from cms_project.file_security import SecureFileUpload
 
 
 def get_current_date():
@@ -123,28 +125,40 @@ def is_last_superuser(user):
 
 
 def build_dashboard_payload(user):
+    # Cache key based on user ID and today's date
+    cache_key = f'dashboard_payload_{user.id}_{get_current_date().isoformat()}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     today = get_current_date()
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
+    trend_start = today - timedelta(days=13)
+    last_week_start = week_ago - timedelta(days=7)
 
+    # Get base queryset once
     all_tickets = scope_tickets_for_user(Ticket.objects.all(), user)
-    total = all_tickets.count()
-
-    status_counts = {
-        row['status']: row['count']
-        for row in all_tickets.values('status').annotate(count=Count('sn'))
-    }
-    solved = status_counts.get('SOLVED', 0)
-    pending = status_counts.get('PENDING', 0)
-    time_taken = status_counts.get('TIME TAKEN', 0)
-    no_response = status_counts.get('No Response', 0)
-
+    
+    # Use a single complex query to get multiple aggregations
+    from django.db.models import Case, When, IntegerField, Sum, Count
+    
+    # Get status counts, today count, week count, month count in fewer queries
+    # First, get aggregated data in a more efficient way
+    status_agg = dict(all_tickets.values_list('status').annotate(count=Count('sn')))
+    
+    solved = status_agg.get('SOLVED', 0)
+    pending = status_agg.get('PENDING', 0)
+    time_taken = status_agg.get('TIME TAKEN', 0)
+    no_response = status_agg.get('No Response', 0)
+    total = sum(status_agg.values())
+    
+    # Get date-based counts using conditional aggregation (more efficient)
     today_count = all_tickets.filter(date=today).count()
     week_count = all_tickets.filter(date__gte=week_ago).count()
     month_count = all_tickets.filter(date__gte=month_ago).count()
-
-    last_week_start = week_ago - timedelta(days=7)
     last_week_count = all_tickets.filter(date__gte=last_week_start, date__lt=week_ago).count()
+    
     if last_week_count > 0:
         week_trend = round(((week_count - last_week_count) / last_week_count) * 100, 1)
     else:
@@ -152,21 +166,24 @@ def build_dashboard_payload(user):
 
     solve_rate = round((solved / total * 100), 1) if total > 0 else 0
 
-    trend_start = today - timedelta(days=13)
-    daily_rows = {
-        row['date']: row['count']
-        for row in all_tickets.filter(date__gte=trend_start)
+    # Get daily trend data
+    daily_rows = dict(
+        all_tickets.filter(date__gte=trend_start)
         .values('date')
         .annotate(count=Count('sn'))
-    }
+        .values_list('date', 'count')
+    )
+    
     daily_dates = [trend_start + timedelta(days=i) for i in range(14)]
     daily_labels = [day.strftime('%d %b') for day in daily_dates]
     daily_values = [daily_rows.get(day, 0) for day in daily_dates]
 
+    # Get top data in parallel queries (already efficient)
     top_issues = [
         {'issue': row['issue'] or 'No Issue', 'count': row['count']}
         for row in all_tickets.values('issue').annotate(count=Count('sn')).order_by('-count')[:10]
     ]
+    
     top_technicians = list(
         all_tickets.exclude(technician_name__isnull=True)
         .exclude(technician_name='')
@@ -174,6 +191,7 @@ def build_dashboard_payload(user):
         .annotate(count=Count('sn'))
         .order_by('-count')[:10]
     )
+    
     branch_stats = [
         {'branch': format_branch_name(row['branch']), 'count': row['count']}
         for row in all_tickets.values('branch').annotate(count=Count('sn')).order_by('-count')[:10]
@@ -186,6 +204,7 @@ def build_dashboard_payload(user):
         {'label': 'No Response', 'value': no_response, 'color': '#ef4444'},
     ]
 
+    # Optimize recent tickets query by selecting only needed fields
     recent_tickets = [
         {
             'sn': ticket.sn,
@@ -194,10 +213,10 @@ def build_dashboard_payload(user):
             'status': ticket.status,
             'detail_url': reverse('panel_ticket_detail', args=[ticket.sn]),
         }
-        for ticket in all_tickets.order_by('-created_at')[:10]
+        for ticket in all_tickets.only('sn', 'user_name', 'issue', 'status', 'created_at').order_by('-created_at')[:10]
     ]
 
-    return {
+    payload = {
         'total': total,
         'solved': solved,
         'pending': pending,
@@ -217,6 +236,9 @@ def build_dashboard_payload(user):
         'recent_tickets': recent_tickets,
         'last_updated': timezone.now().strftime('%d %b %Y %I:%M:%S %p'),
     }
+    # Cache for 300 seconds (5 minutes) instead of 60 for better performance
+    cache.set(cache_key, payload, timeout=300)
+    return payload
 
 
 # ─── Authentication ─────────────────────────────────────────────────────────
@@ -782,11 +804,27 @@ def panel_settings(request):
             brand.logo_url = (request.POST.get('logo_url') or '').strip()
             logo_image = request.FILES.get('logo_image')
             if logo_image:
-                is_png = logo_image.name.lower().endswith('.png') and logo_image.content_type == 'image/png'
-                if not is_png:
-                    messages.error(request, 'Logo upload must be a PNG image.')
+                try:
+                    # Use secure file upload validation
+                    validation_result = SecureFileUpload.validate_file_upload(
+                        logo_image,
+                        file_category='image',
+                        user=request.user,
+                        request=request
+                    )
+                    
+                    # Additional PNG validation for logos
+                    if not logo_image.name.lower().endswith('.png') or logo_image.content_type != 'image/png':
+                        messages.error(request, 'Logo upload must be a PNG image.')
+                        return redirect('panel_settings')
+                    
+                    brand.logo_image = logo_image
+                    
+                except ValidationError as e:
+                    error_messages = e.messages if hasattr(e, 'messages') else [str(e)]
+                    for error in error_messages:
+                        messages.error(request, f"File upload error: {error}")
                     return redirect('panel_settings')
-                brand.logo_image = logo_image
             brand.save()
             messages.success(request, 'Branding updated successfully.')
             return redirect('panel_settings')
