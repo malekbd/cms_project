@@ -28,7 +28,9 @@ proc_name = "cms_gunicorn"
 
 # Server mechanics
 daemon = False
-pidfile = "/home/cmsuser/cms_project/gunicorn.pid"
+# systemd tracks the master process; avoiding a pidfile prevents stale PID
+# restart loops after an unclean stop.
+pidfile = None
 umask = 0o007
 user = "cmsuser"
 group = "cmsuser"

@@ -4,7 +4,6 @@ Provides protection against malicious file uploads and ensures secure media hand
 """
 
 import os
-import magic
 import hashlib
 import logging
 from pathlib import Path
@@ -15,6 +14,11 @@ from django.conf import settings
 from .security_utils import InputValidator
 
 logger = logging.getLogger('security')
+
+try:
+    import magic
+except ImportError:
+    magic = None
 
 
 class SecureFileUpload:
@@ -117,6 +121,9 @@ class SecureFileUpload:
         
         # 4. Validate MIME type
         try:
+            if magic is None:
+                raise ValidationError("File type verification is unavailable. Please contact support.")
+
             # Read first 2048 bytes for MIME detection
             file_content = uploaded_file.read(2048)
             uploaded_file.seek(0)  # Reset file pointer

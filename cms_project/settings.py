@@ -106,6 +106,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.gzip.GZipMiddleware',
     'cms_project.metrics_exporter.MetricsMiddleware',
     'cms_project.security_hardening.EnhancedSecurityMiddleware',
@@ -117,12 +123,6 @@ MIDDLEWARE = [
     'cms_project.middleware.SecurityHeadersMiddleware',
     'cms_project.performance_middleware.PerformanceMiddleware',
     'cms_project.performance_middleware.QueryOptimizationMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'cms_project.middleware.ErrorHandlingMiddleware',
 ]
 
@@ -233,7 +233,10 @@ else:
         
         DATABASE_ROUTERS = ['cms_project.db_routers.PrimaryReplicaRouter']
 
-DATABASES['default']['OPTIONS']['options'] = f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)}"
+if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+    DATABASES['default'].setdefault('OPTIONS', {})['options'] = (
+        f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)}"
+    )
 
 if config('DB_CONNECTION_HEALTH_CHECKS', default=True, cast=bool):
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
@@ -269,7 +272,6 @@ try:
                 'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
                 'COMPRESSOR_LEVEL': 5,
                 'IGNORE_EXCEPTIONS': True,
-                'PARSER_CLASS': 'redis.connection.HiredisParser' if config('USE_HIREDIS', default=False, cast=bool) else 'redis.connection.PythonParser',
             },
             'KEY_PREFIX': 'cms_cache',
             'TIMEOUT': 600,

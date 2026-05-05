@@ -14,12 +14,13 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def make_cache_key(key: str, version: Optional[int] = None) -> str:
+def make_cache_key(key: str, key_prefix: str = "", version: Optional[int] = None) -> str:
     """
     Generate a consistent cache key with versioning and environment prefix.
     
     Args:
         key: The base cache key
+        key_prefix: Optional Django cache key prefix
         version: Optional version number for cache invalidation
         
     Returns:
@@ -28,12 +29,14 @@ def make_cache_key(key: str, version: Optional[int] = None) -> str:
     # Add environment prefix (development, staging, production)
     env_prefix = "dev" if settings.DEBUG else "prod"
     
-    # Add version if provided
+    key_parts = [env_prefix]
+    if key_prefix:
+        key_parts.append(str(key_prefix))
+    key_parts.append(str(key))
     if version is not None:
-        key = f"{key}:v{version}"
-    
-    # Return formatted key
-    return f"{env_prefix}:{key}"
+        key_parts.append(f"v{version}")
+
+    return ":".join(key_parts)
 
 
 def generate_request_cache_key(request, prefix: str = "view") -> str:
@@ -79,7 +82,7 @@ def cache_get_or_set(key: str, func, timeout: Optional[int] = None,
         Cached or freshly computed value
     """
     # Generate full cache key
-    full_key = make_cache_key(key, version)
+    full_key = make_cache_key(key, version=version)
     
     # Try to get from cache
     cached_value = cache.get(full_key)
@@ -262,7 +265,7 @@ def cache_with_fallback(key: str, func, fallback_func=None,
     Returns:
         Cached value or computed/fallback value
     """
-    full_key = make_cache_key(key, version)
+    full_key = make_cache_key(key, version=version)
     
     # Try cache first
     cached = cache.get(full_key)

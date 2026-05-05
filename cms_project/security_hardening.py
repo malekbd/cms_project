@@ -26,14 +26,14 @@ class EnhancedSecurityMiddleware(SecurityMiddleware):
         response = self.get_response(request)
         
         # Add additional security headers
-        self.add_security_headers(response)
+        self.add_security_headers(request, response)
         
         # Apply security policies
         self.apply_security_policies(request, response)
         
         return response
     
-    def add_security_headers(self, response):
+    def add_security_headers(self, request, response):
         """
         Add comprehensive security headers to the response.
         """
@@ -112,9 +112,11 @@ class EnhancedSecurityMiddleware(SecurityMiddleware):
         """
         # Log authentication events
         if request.path in ['/panel/login/', '/panel/logout/', '/admin/login/']:
+            user = getattr(request, 'user', None)
+            username = user if getattr(user, 'is_authenticated', False) else 'anonymous'
             logger.info(
                 f"Security event: {request.method} {request.path} - "
-                f"User: {request.user if request.user.is_authenticated else 'anonymous'} - "
+                f"User: {username} - "
                 f"IP: {self.get_client_ip(request)} - "
                 f"Status: {response.status_code}"
             )
@@ -282,7 +284,7 @@ class SecurityAuditLogger:
             'timestamp': os.path.getmtime(__file__),
             'ip_address': SecurityAuditLogger.get_client_ip(request),
             'user_agent': request.META.get('HTTP_USER_AGENT', 'Unknown'),
-            'user': str(request.user) if request.user.is_authenticated else 'anonymous',
+            'user': str(request.user) if getattr(getattr(request, 'user', None), 'is_authenticated', False) else 'anonymous',
             'method': request.method,
             'path': request.path,
             'details': details or {},

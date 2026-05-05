@@ -126,15 +126,16 @@ class AuthorizationMiddleware:
     
     def __call__(self, request):
         # Skip authorization for non-authenticated users (they'll be caught by login_required)
-        if not request.user.is_authenticated:
+        user = getattr(request, 'user', None)
+        if not getattr(user, 'is_authenticated', False):
             return self.get_response(request)
         
         # Check if user is trying to access sensitive endpoints without proper permissions
         for endpoint in self.SENSITIVE_ENDPOINTS:
             if request.path.startswith(endpoint):
-                if not request.user.is_superuser:
+                if not user.is_superuser:
                     logger.warning(
-                        f"Unauthorized access attempt to {request.path} by user {request.user.username} "
+                        f"Unauthorized access attempt to {request.path} by user {user.username} "
                         f"from IP {self._get_client_ip(request)}"
                     )
                     return HttpResponseForbidden("You don't have permission to access this resource.")

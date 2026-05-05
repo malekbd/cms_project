@@ -40,9 +40,11 @@ class RateLimiter:
         else:
             ip = request.META.get('REMOTE_ADDR', 'unknown')
         
-        # For authenticated users, include user ID
-        if request.user.is_authenticated:
-            return f"user_{request.user.id}_{ip}"
+        # For authenticated users, include user ID. Some middleware paths can run
+        # before AuthenticationMiddleware during error handling, so access safely.
+        user = getattr(request, 'user', None)
+        if getattr(user, 'is_authenticated', False):
+            return f"user_{user.id}_{ip}"
         return f"ip_{ip}"
     
     @staticmethod
@@ -68,7 +70,8 @@ class RateLimiter:
         Returns (is_limited, retry_after_seconds) tuple.
         """
         # Skip rate limiting for superusers in development
-        if settings.DEBUG and request.user.is_superuser:
+        user = getattr(request, 'user', None)
+        if settings.DEBUG and getattr(user, 'is_superuser', False):
             return False, 0
         
         client_id = RateLimiter.get_client_identifier(request)
