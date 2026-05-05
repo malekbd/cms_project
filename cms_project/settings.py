@@ -259,13 +259,14 @@ else:
     
 # Database connection pooling via psycopg2-pool is not enabled by default.
 # Removed non-standard Django OPTIONS in favor of stable, well-supported configuration.
+
+# Database performance settings
+DATABASES['default']['OPTIONS']['options'] = f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)}"
     
-    # Database performance settings
-    DATABASES['default']['OPTIONS']['options'] = f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)}"
-    
-    # Configure connection health checks
-    if config('DB_CONNECTION_HEALTH_CHECKS', default=True, cast=bool):
-        DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True  # Better for connection pooling
+
+# Configure connection health checks
+if config('DB_CONNECTION_HEALTH_CHECKS', default=True, cast=bool):
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True  # Better for connection pooling
 
 # Cache configuration - Enhanced Redis setup with multiple cache backends
 REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
