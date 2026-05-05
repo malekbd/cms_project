@@ -1,70 +1,96 @@
-# Core Django Dependencies
-Django==6.0.4  # Latest LTS version with security patches
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.13.0
 asgiref==3.11.1
-sqlparse==0.5.5
-tzdata==2026.2  # Updated to latest
-typing_extensions==4.15.0
-
-# Database
+attrs==26.1.0
+Authlib==1.7.1
+autopep8==2.3.2
+bandit==1.7.10
+bcrypt==5.0.0
+blinker==1.9.0
+certifi==2026.4.22
+cffi==2.0.0
+charset-normalizer==3.4.7
+click==8.3.3
+colorama==0.4.6
+cryptography==48.0.0
 dj-database-url==3.1.2
-psycopg2-binary==2.9.12  # Updated for security fixes
-psycopg2-pool==1.2  # Added for connection pooling
-
-# Django Extensions & Utilities
+Django==6.0.4
+django-axes==6.0.0
 django-crispy-forms==2.6
+django-csp==4.0
+django-debug-toolbar==6.3.0
 django-filter==25.2
 django-jazzmin==3.0.4
-python-decouple==3.8
-
-# Security & Authentication
-bcrypt==5.0.0
-PyJWT==2.12.1
-django-axes==6.0.0  # Added for login security and brute force protection
-django-csp==4.0  # Added for Content Security Policy
-django-security==0.12.0  # Added for additional security features
-
-# Development & Production Server
+django-prometheus==2.4.0
+django-redis==5.4.0
+django-security==0.12.0
+django-silk==5.1.0
+djangorestframework==3.17.1
+dparse==0.6.4
+drf-spectacular==0.28.0
+filelock==3.29.0
+gprof2dot==2025.4.14
+greenlet==3.5.0
 gunicorn==25.3.0
-whitenoise==6.12.0
-uvicorn==0.34.0  # Added for ASGI support
-django-redis==5.4.0  # Added for Redis caching
-
-# Reporting & PDF Generation
-reportlab==4.5.0  # Updated
-pillow==12.2.0
-
-# Date & Time Utilities
-python-dateutil==2.8.0
-six==1.17.0
-
-# Additional Utilities
-blinker==1.9.0
-charset-normalizer==3.4.7
-click==8.3.3  # Updated
-colorama==0.4.6
-greenlet==3.5.0  # Updated
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.13
+inflection==0.5.1
 itsdangerous==2.2.0
 Jinja2==3.1.6
+joblib==1.5.3
+joserfc==1.6.4
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+markdown-it-py==4.0.0
 MarkupSafe==3.0.3
-packaging==26.2  # Updated
+marshmallow==4.3.0
+mdurl==0.1.2
+nltk==3.9.4
+packaging==26.2
+pillow==12.2.0
+prometheus_client==0.23.1
+psutil==7.2.2
+psycopg2-binary==2.9.12
+psycopg2-pool==1.2
+pycodestyle==2.14.0
+pycparser==3.0
+pydantic==2.13.3
+pydantic_core==2.46.3
+Pygments==2.20.0
+PyJWT==2.12.1
+python-dateutil==2.8.0
+python-decouple==3.8
+python-dotenv==1.0.1
+PyYAML==6.0.3
+redis==5.2.1
+referencing==0.37.0
+regex==2026.4.4
+reportlab==4.5.0
+requests==2.33.1
+rich==15.0.0
+rpds-py==0.30.0
+ruamel.yaml==0.19.1
+safety==3.7.0
+safety-schemas==0.0.16
+setuptools==82.0.1
+shellingham==1.5.4
+six==1.17.0
+sqlparse==0.5.5
+stevedore==5.7.0
+tenacity==9.1.4
+tomlkit==0.14.0
+tqdm==4.67.3
+typer==0.25.1
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+tzdata==2026.2
+ua-parser==1.0.2
+ua-parser-builtins==202605
+uritemplate==4.2.0
+urllib3==2.6.3
+uvicorn==0.34.0
 Werkzeug==3.1.8
-
-# Security Scanning & Monitoring
-bandit==1.7.10  # Security linter for Python code
-safety==3.7.0  # Added for dependency vulnerability scanning
-
-# Performance & Monitoring
-django-debug-toolbar==6.3.0  # Added for development performance monitoring
-django-silk==5.1.0  # Added for production performance profiling
-prometheus-client==0.23.1  # Added for metrics collection
-django-prometheus==2.4.0  # Added for Django metrics
-
-# Infrastructure & Deployment
-python-dotenv==1.0.1  # Added for environment management
-redis==5.2.1  # Added for Redis client
-# celery==5.4.0  # Added for task queue (optional)
-# django-celery-results==2.6.0  # Added for Celery results (optional)
-
-# API & Documentation
-djangorestframework==3.17.1
-drf-spectacular==0.28.0
+whitenoise==6.12.0
