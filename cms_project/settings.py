@@ -257,19 +257,8 @@ else:
         # Configure database router for read/write splitting
         DATABASE_ROUTERS = ['cms_project.db_routers.PrimaryReplicaRouter']
     
-    # Configure database connection pooling with psycopg2-pool if available
-    try:
-        import psycopg2_pool
-        DATABASES['default']['OPTIONS']['pool'] = {
-            'min_size': config('DB_POOL_MIN_SIZE', default=5, cast=int),
-            'max_size': config('DB_POOL_MAX_SIZE', default=20, cast=int),
-            'max_idle': config('DB_POOL_MAX_IDLE', default=300, cast=int),  # 5 minutes
-            'max_lifetime': config('DB_POOL_MAX_LIFETIME', default=1800, cast=int),  # 30 minutes
-            'reconnect': True,
-            'pre_ping': True,  # Verify connection before using
-        }
-    except ImportError:
-        pass
+# Database connection pooling via psycopg2-pool is not enabled by default.
+# Removed non-standard Django OPTIONS in favor of stable, well-supported configuration.
     
     # Database performance settings
     DATABASES['default']['OPTIONS']['options'] = f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)}"
@@ -443,21 +432,7 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message} - IP: {ip} User: {user} Action: {action}',
             'style': '{',
         },
-        'json': {
-            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-            'format': '''
-                asctime: %(asctime)s
-                levelname: %(levelname)s
-                name: %(name)s
-                message: %(message)s
-                module: %(module)s
-                funcName: %(funcName)s
-                lineno: %(lineno)s
-                process: %(process)d
-                thread: %(thread)d
-                pathname: %(pathname)s
-            ''',
-        },
+        # Removed json-based structured formatter; using verbose/simple instead
         'performance': {
             'format': '{levelname} {asctime} {module} {duration:.3f}s {message}',
             'style': '{',
@@ -474,7 +449,7 @@ LOGGING = {
             'level': 'INFO',
             'filters': ['require_debug_false'],
             'class': 'logging.StreamHandler',
-            'formatter': 'json',
+            'formatter': 'verbose',
         },
         'file': {
             'level': config('LOG_LEVEL', default='INFO'),
