@@ -1,0 +1,70 @@
+name: CD
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Django tests
+        env:
+          DJANGO_SETTINGS_MODULE: cms_project.settings
+        run: |
+          python manage.py test
+
+      - name: Lint (optional)
+        if: always()
+        run: |
+          python -m pip install --upgrade ruff  || true
+          ruff check . || true
+
+  deploy:
+    needs: build-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            cd /home/cmsuser/cms_project/
+            git fetch origin
+            git reset --hard origin/main
+            source venv/bin/activate
+            pip install -r requirements.txt
+            python3 manage.py migrate
+            python3 manage.py collectstatic --noinput
+            systemctl restart cms
+            systemctl restart gunicorn
+            systemctl restart nginx
+            HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://cms.frcbd.net/health/ || echo 0)
+            if [ "$HEALTH" -ge 200 ] && [ "$HEALTH" -lt 300 ]; then
+              echo "Health check passed: $HEALTH"
+            else
+              echo "Health check failed: $HEALTH"
+              exit 1
+            fi
