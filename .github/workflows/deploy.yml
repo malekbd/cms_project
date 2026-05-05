@@ -18,13 +18,21 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 2111
-          script: |
-            cd /home/cmsuser/cms_project/
-            git pull origin main
-            source venv/bin/activate
-            pip install -r requirements.txt
-            python3 manage.py migrate
-            python3 manage.py collectstatic --noinput
-            systemctl restart gunicorn
-            systemctl restart nginx
-            systemctl restart cms
+            script: |
+              cd /home/cmsuser/cms_project/
+              git pull origin main
+              source venv/bin/activate
+              pip install -r requirements.txt
+              python3 manage.py migrate
+              python3 manage.py collectstatic --noinput
+              systemctl restart gunicorn
+              systemctl restart nginx
+              systemctl restart cms
+              # Smoke health check after deploy
+              HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://cms.frcbd.net/health/ || echo 0)
+              if [ "$HEALTH" -ge 200 ] && [ "$HEALTH" -lt 300 ]; then
+                echo "Health check passed: $HEALTH"
+              else
+                echo "Health check failed: $HEALTH"
+                exit 1
+              fi
