@@ -3,7 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from . import health_views
-from .metrics_exporter import metrics_prometheus, metrics_json, health_check, health_liveness, health_readiness
+from .metrics_exporter import metrics_prometheus, metrics_json
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
@@ -11,10 +11,10 @@ urlpatterns = [
     path('panel/', include('tickets.panel_urls')),
     path('', include('tickets.urls')),
     
-    # Health check and monitoring endpoints
-    path('health/', health_check, name='health_check'),
-    path('health/liveness/', health_liveness, name='health_liveness'),
-    path('health/readiness/', health_readiness, name='health_readiness'),
+    # Health check and monitoring endpoints (consolidated in health_views)
+    path('health/', health_views.health_check, name='health_check'),
+    path('health/liveness/', health_views.health_check_liveness, name='health_liveness'),
+    path('health/readiness/', health_views.health_check_readiness, name='health_readiness'),
     path('metrics/', metrics_prometheus, name='metrics_prometheus'),
     path('metrics/json/', metrics_json, name='metrics_json'),
     path('status/', health_views.status, name='status'),

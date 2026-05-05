@@ -3,11 +3,8 @@
 import os
 import sys
 
-# Apply security patch before Django loads any apps
-try:
-    from cms_project.security_patch import *
-except ImportError:
-    pass  # Patch not available, continue anyway
+# Security patches are not applied via runtime monkey-patching.
+# Managed explicitly in code or during deployment steps.
 
 
 def main():
