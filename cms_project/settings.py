@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import sys
+from urllib.parse import urlparse, urlunparse
 from decouple import config
 import csp.constants
 
@@ -261,16 +262,23 @@ if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
 if config('DB_CONNECTION_HEALTH_CHECKS', default=True, cast=bool):
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 
-REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+REDIS_URL = config('REDIS_URL', default='redis://localhost:6379')
 REDIS_PASSWORD = config('REDIS_PASSWORD', default='')
 REDIS_DB_CACHE = config('REDIS_DB_CACHE', default=0, cast=int)
 REDIS_DB_SESSION = config('REDIS_DB_SESSION', default=1, cast=int)
 REDIS_DB_CELERY = config('REDIS_DB_CELERY', default=2, cast=int)
 
-if REDIS_PASSWORD:
-    REDIS_CACHE_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_URL.split('://')[1].split('@')[-1]}/{REDIS_DB_CACHE}"
-else:
-    REDIS_CACHE_URL = f"{REDIS_URL}/{REDIS_DB_CACHE}"
+def redis_url_for_db(db_number):
+    parsed = urlparse(REDIS_URL)
+    scheme = parsed.scheme or 'redis'
+    netloc = parsed.netloc
+
+    if REDIS_PASSWORD and '@' not in netloc:
+        netloc = f":{REDIS_PASSWORD}@{netloc}"
+
+    return urlunparse((scheme, netloc, f"/{db_number}", '', '', ''))
+
+REDIS_CACHE_URL = redis_url_for_db(REDIS_DB_CACHE)
 
 try:
     import redis
@@ -299,7 +307,7 @@ try:
         },
         'session': {
             'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': f"{REDIS_URL}/{REDIS_DB_SESSION}" if not REDIS_PASSWORD else f"redis://:{REDIS_PASSWORD}@{REDIS_URL.split('://')[1].split('@')[-1]}/{REDIS_DB_SESSION}",
+            'LOCATION': redis_url_for_db(REDIS_DB_SESSION),
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
                 'CONNECTION_POOL_KWARGS': {'max_connections': 50},
@@ -311,7 +319,7 @@ try:
         },
         'rate_limit': {
             'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': f"{REDIS_URL}/3" if not REDIS_PASSWORD else f"redis://:{REDIS_PASSWORD}@{REDIS_URL.split('://')[1].split('@')[-1]}/3",
+            'LOCATION': redis_url_for_db(3),
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
                 'CONNECTION_POOL_KWARGS': {'max_connections': 30},
@@ -327,7 +335,7 @@ try:
         SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
         SESSION_CACHE_ALIAS = 'session'
     
-    CELERY_BROKER_URL = f"{REDIS_URL}/{REDIS_DB_CELERY}" if not REDIS_PASSWORD else f"redis://:{REDIS_PASSWORD}@{REDIS_URL.split('://')[1].split('@')[-1]}/{REDIS_DB_CELERY}"
+    CELERY_BROKER_URL = redis_url_for_db(REDIS_DB_CELERY)
     CELERY_RESULT_BACKEND = CELERY_BROKER_URL
     
 except ImportError:
