@@ -597,7 +597,7 @@ send_deployment_notification() {
     # Example Slack notification (commented out)
     # curl -X POST -H 'Content-type: application/json' \
     # --data "{\"text\":\"Deployment $DEPLOYMENT_ID completed for $ENVIRONMENT environment\"}" \
-    # https://hooks.slack.com/services/...
+    # https://example.slack.webhook.url/...
 }
 
 # Error handling wrapper
