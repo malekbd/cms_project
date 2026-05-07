@@ -104,6 +104,9 @@ INSTALLED_APPS = [
     'tickets',
 ]
 
+if DEBUG:
+    INSTALLED_APPS += ['debug_toolbar']
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -113,6 +116,12 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.gzip.GZipMiddleware',
+]
+
+if DEBUG:
+    MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+
+MIDDLEWARE += [
     'cms_project.metrics_exporter.MetricsMiddleware',
     'cms_project.security_hardening.EnhancedSecurityMiddleware',
     'cms_project.security_utils.XSSProtectionMiddleware',
@@ -154,6 +163,14 @@ if 'test' in sys.argv:
             'NAME': ':memory:',
         }
     }
+elif DEBUG:
+    # Use SQLite for development when DEBUG=True
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 else:
     DATABASES = {
         'default': {
@@ -173,10 +190,6 @@ else:
                 'keepalives_count': 5,
                 'sslmode': config('DB_SSL_MODE', default='prefer'),
                 'application_name': 'cms_project',
-                'pool_size': config('DB_POOL_SIZE', default=20, cast=int),
-                'max_overflow': config('DB_MAX_OVERFLOW', default=10, cast=int),
-                'pool_timeout': config('DB_POOL_TIMEOUT', default=30, cast=int),
-                'pool_recycle': config('DB_POOL_RECYCLE', default=3600, cast=int),
                 'statement_timeout': config('DB_STATEMENT_TIMEOUT', default=30000, cast=int),
                 'idle_in_transaction_session_timeout': config('DB_IDLE_TIMEOUT', default=10000, cast=int),
             },
