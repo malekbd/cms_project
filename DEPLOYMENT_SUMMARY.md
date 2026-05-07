@@ -103,7 +103,7 @@ server {
 
     location / {
         include proxy_params;
-        proxy_pass http://unix:/home/cmsuser/cms_project/cms.sock;
+        proxy_pass http://unix:/run/cms/cms.sock;
         proxy_connect_timeout 300s;
         proxy_send_timeout 300s;
         proxy_read_timeout 300s;

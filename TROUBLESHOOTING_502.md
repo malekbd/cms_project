@@ -38,7 +38,8 @@ tail -f logs/database.log
 netstat -tlnp | grep :8000
 
 # Check Unix socket (Linux only)
-ls -la /home/cmsuser/cms_project/cms.sock
+sudo ss -xlpn | grep cms.sock
+ls -la /run/cms/cms.sock
 ```
 
 ## Common Solutions
@@ -67,26 +68,50 @@ ls -la /home/cmsuser/cms_project/cms.sock
 **Problem:** Unix socket doesn't exist or has wrong permissions.
 
 **Fix:**
-1. Create the socket directory:
+1. Check the app service logs first:
    ```bash
-   sudo mkdir -p /home/cmsuser/cms_project
-   sudo chown cmsuser:cmsuser /home/cmsuser/cms_project
+   sudo systemctl status cms --no-pager -l
+   sudo journalctl -u cms -n 100 --no-pager
+   tail -n 100 /home/cmsuser/cms_project/logs/gunicorn-error.log
    ```
 
-2. Update Gunicorn config to use TCP instead (temporary fix):
-   In `gunicorn.conf.py`, change:
-   ```python
-   bind = "unix:/home/cmsuser/cms_project/cms.sock"
-   ```
-   To:
-   ```python
-   bind = "127.0.0.1:8000"
+2. Remove any stale project-root socket from older deployments:
+   ```bash
+   sudo rm -f /home/cmsuser/cms_project/cms.sock
    ```
 
-3. Restart services:
+3. Make sure Nginx proxies to the runtime socket:
+   ```nginx
+   location / {
+       proxy_pass http://unix:/run/cms/cms.sock;
+   }
+   ```
+
+4. Restart services:
    ```bash
+   sudo systemctl daemon-reload
    sudo systemctl restart cms
-   sudo systemctl restart nginx
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+5. If your Nginx worker user is not `www-data`, set `Group=` in `cms.service` and `GUNICORN_GROUP`/`group` in `gunicorn.conf.py` to the actual Nginx group.
+
+**Legacy project-root socket fallback:**
+If you must keep `/home/cmsuser/cms_project/cms.sock`, the service needs write access to the project root, because Gunicorn must create and remove the socket file:
+   ```bash
+   sudo systemctl edit cms
+   ```
+   Add:
+   ```ini
+   [Service]
+   ProtectHome=read-only
+   ReadWritePaths=/home/cmsuser/cms_project
+   ```
+   Then:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl restart cms
+   sudo nginx -t && sudo systemctl reload nginx
    ```
 
 ### Solution 3: Database connection issues
@@ -130,7 +155,7 @@ ls -la /home/cmsuser/cms_project/cms.sock
    Should have:
    ```nginx
    location / {
-       proxy_pass http://unix:/home/cmsuser/cms_project/cms.sock;
+       proxy_pass http://unix:/run/cms/cms.sock;
        # or for TCP: proxy_pass http://127.0.0.1:8000;
    }
    ```

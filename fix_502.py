@@ -47,7 +47,7 @@ def check_gunicorn_process():
 
 def check_socket_file():
     """Check if the Unix socket file exists and has correct permissions."""
-    socket_path = "/home/cmsuser/cms_project/cms.sock"
+    socket_path = os.environ.get("GUNICORN_SOCKET", "/run/cms/cms.sock")
     print(f"Checking socket file: {socket_path}")
     
     if sys.platform == "win32":
@@ -166,7 +166,7 @@ def fix_gunicorn_config():
             print("⚠ Windows detected but config uses Unix socket")
             # Suggest using TCP instead
             new_content = content.replace(
-                'bind = "unix:/home/cmsuser/cms_project/cms.sock"',
+                'bind = "unix:/run/cms/cms.sock"',
                 'bind = "127.0.0.1:8000"  # Changed from Unix socket for Windows compatibility'
             )
             if new_content != content:
@@ -301,7 +301,7 @@ def main():
     else:
         print("1. Check Gunicorn logs: tail -f logs/gunicorn-error.log")
         print("2. Check Nginx logs: tail -f /var/log/nginx/error.log")
-        print("3. Verify socket permissions: sudo chown cmsuser:cmsuser /home/cmsuser/cms_project/cms.sock")
+        print("3. Verify socket permissions: ls -la /run/cms/cms.sock")
     
     print("\n" + "=" * 60)
     print("Diagnostic complete. Check the recommendations above.")

@@ -7,19 +7,21 @@ Wants=redis-server.service
 [Service]
 Type=notify
 User=cmsuser
-Group=cmsuser
+Group=www-data
 WorkingDirectory=/home/cmsuser/cms_project
 Environment="PATH=/home/cmsuser/cms_project/venv/bin"
 Environment="DJANGO_SETTINGS_MODULE=cms_project.settings"
 Environment="PYTHONPATH=/home/cmsuser/cms_project"
 Environment="PYTHONUNBUFFERED=1"
+RuntimeDirectory=cms
+RuntimeDirectoryMode=0750
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
+ProtectHome=read-only
+ReadWritePaths=/run/cms /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
 ReadOnlyPaths=/home/cmsuser/cms_project
 PrivateDevices=true
 ProtectKernelTunables=true

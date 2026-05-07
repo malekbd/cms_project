@@ -27,6 +27,7 @@ LOG_DIR="$PROJECT_DIR/logs"
 BACKUP_DIR="$PROJECT_DIR/backups"
 DEPLOYMENTS_DIR="$PROJECT_DIR/deployments"
 CURRENT_LINK="$PROJECT_DIR/current"
+GUNICORN_SOCKET="${GUNICORN_SOCKET:-/run/cms/cms.sock}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Colors for output
@@ -222,8 +223,8 @@ run_tests() {
 restart_services() {
     log "Restarting services..."
     
-    # Restart Gunicorn
-    if systemctl is-active --quiet cms.service; then
+    # Restart or start Gunicorn
+    if systemctl cat cms.service >/dev/null 2>&1; then
         sudo systemctl restart cms.service
         log "Gunicorn service restarted"
     else
@@ -266,9 +267,9 @@ run_health_checks() {
     if systemctl is-active --quiet cms.service; then
         log "CMS service is running"
         
-        # Try to call health endpoint via curl if available
+        # Try to call health endpoint through the same Unix socket Nginx uses
         if command -v curl &> /dev/null; then
-            if curl -f -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8000/health/ 2>/dev/null | grep -q "200"; then
+            if curl --unix-socket "$GUNICORN_SOCKET" -f -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost/health/ 2>/dev/null | grep -q "200"; then
                 log "Health endpoint responded with 200 OK"
             else
                 warn "Health endpoint not responding with 200 OK (service might still be starting)"
@@ -404,7 +405,7 @@ validate_deployment() {
     log "Validating deployment..."
     
     # Check if application is running
-    if curl -s -f http://localhost:8000/health/liveness/ > /dev/null; then
+    if curl --unix-socket "$GUNICORN_SOCKET" -s -f http://localhost/health/liveness/ > /dev/null; then
         log "Application is responding to health checks"
     else
         error "Application is not responding after deployment"

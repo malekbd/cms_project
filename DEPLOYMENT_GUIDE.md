@@ -102,11 +102,17 @@ Description=CMS Django Project
 After=network.target
 
 [Service]
+Type=notify
 User=cmsuser
 Group=www-data
 WorkingDirectory=/home/cmsuser/cms_project
 Environment=PATH=/home/cmsuser/cms_project/venv/bin
-ExecStart=/home/cmsuser/cms_project/venv/bin/gunicorn --workers 3 --bind unix:/home/cmsuser/cms_project/cms.sock cms_project.wsgi:application
+RuntimeDirectory=cms
+RuntimeDirectoryMode=0750
+ExecStart=/home/cmsuser/cms_project/venv/bin/gunicorn --config /home/cmsuser/cms_project/gunicorn.conf.py cms_project.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
@@ -144,7 +150,7 @@ server {
 
     location / {
         include proxy_params;
-        proxy_pass http://unix:/home/cmsuser/cms_project/cms.sock;
+        proxy_pass http://unix:/run/cms/cms.sock;
         proxy_connect_timeout 300s;
         proxy_send_timeout 300s;
         proxy_read_timeout 300s;
@@ -238,8 +244,8 @@ tail -f /home/cmsuser/cms_project/logs/django.log
 
 ### Gunicorn Workers
 ```bash
-# Update workers based on CPU cores (2x cores + 1)
-ExecStart=/home/cmsuser/cms_project/venv/bin/gunicorn --workers 5 --bind unix:/home/cmsuser/cms_project/cms.sock cms_project.wsgi:application
+# Update workers in gunicorn.conf.py based on CPU cores (2x cores + 1)
+workers = 5
 ```
 
 ### Nginx Caching (Optional)

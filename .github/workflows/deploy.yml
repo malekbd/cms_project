@@ -159,14 +159,13 @@ jobs:
           # Restart services
           echo "⚡ Restarting services..."
           systemctl daemon-reload
-          systemctl restart gunicorn
-          systemctl restart nginx
           systemctl restart cms
+          systemctl reload nginx
           
           # Health check
           echo "🏥 Performing health check..."
           sleep 5
-          if curl -f http://localhost:8000/health/; then
+          if curl --unix-socket /run/cms/cms.sock -f http://localhost/health/; then
             echo "✅ Deployment completed successfully!"
             echo "Health check passed"
           else

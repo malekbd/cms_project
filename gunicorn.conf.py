@@ -5,7 +5,7 @@ import multiprocessing
 import os
 
 # Server socket
-bind = "unix:/home/cmsuser/cms_project/cms.sock"
+bind = os.getenv("GUNICORN_BIND", "unix:/run/cms/cms.sock")
 backlog = 2048
 
 # Worker processes
@@ -32,8 +32,8 @@ daemon = False
 # restart loops after an unclean stop.
 pidfile = None
 umask = 0o007
-user = "cmsuser"
-group = "cmsuser"
+user = os.getenv("GUNICORN_USER", "cmsuser")
+group = os.getenv("GUNICORN_GROUP", "www-data")
 tmp_upload_dir = "/tmp"
 
 # Logging

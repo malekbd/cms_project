@@ -94,15 +94,14 @@ jobs:
           python manage.py check --deploy
           
           echo "🔄 Restarting services..."
-          systemctl restart gunicorn
-          systemctl restart nginx
           systemctl restart cms
+          systemctl reload nginx
           
           echo "✅ Staging deployment completed successfully!"
           
           # Run health check
           sleep 5
-          curl -f http://localhost:8000/health/ || echo "Health check failed but deployment completed"
+          curl --unix-socket /run/cms/cms.sock -f http://localhost/health/ || echo "Health check failed but deployment completed"
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -190,9 +189,8 @@ jobs:
           
           echo "⚡ Restarting services with new deployment..."
           systemctl daemon-reload
-          systemctl restart gunicorn
-          systemctl restart nginx
           systemctl restart cms
+          systemctl reload nginx
           
           echo "⏳ Waiting for services to stabilize..."
           sleep 10
@@ -201,7 +199,7 @@ jobs:
           MAX_RETRIES=5
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if curl -f http://localhost:8000/health/; then
+            if curl --unix-socket /run/cms/cms.sock -f http://localhost/health/; then
               echo "✅ Health check passed!"
               break
             else
@@ -216,9 +214,8 @@ jobs:
             echo "🔄 Attempting rollback..."
             cd /home/cmsuser/cms_project
             ln -sfn "$(readlink -f current.old)" current 2>/dev/null || true
-            systemctl restart gunicorn
-            systemctl restart nginx
             systemctl restart cms
+            systemctl reload nginx
             exit 1
           fi
           
@@ -268,9 +265,8 @@ jobs:
           echo "📦 Restoring from backup: $LATEST_BACKUP"
           
           # Stop services
-          systemctl stop gunicorn
-          systemctl stop nginx
           systemctl stop cms
+          systemctl stop nginx
           
           # Restore files
           tar -xzf "$LATEST_BACKUP/full_backup.tar.gz" -C /home/cmsuser/cms_project --strip-components=1
@@ -281,12 +277,11 @@ jobs:
           fi
           
           # Restart services
-          systemctl start gunicorn
-          systemctl start nginx
           systemctl start cms
+          systemctl start nginx
           
           echo "✅ Rollback completed successfully"
           
           # Verify rollback
           sleep 5
-          curl -f http://localhost:8000/health/ && echo "✅ Rollback verified" || echo "⚠️ Rollback completed but health check failed"
+          curl --unix-socket /run/cms/cms.sock -f http://localhost/health/ && echo "✅ Rollback verified" || echo "⚠️ Rollback completed but health check failed"
