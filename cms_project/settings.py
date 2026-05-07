@@ -59,21 +59,17 @@ LOGIN_TIMEOUT_MINUTES = config('LOGIN_TIMEOUT_MINUTES', default=30, cast=int)
 
 CSP_ENABLED = config('CSP_ENABLED', default=DEBUG is False, cast=bool)
 if CSP_ENABLED:
-    CONTENT_SECURITY_POLICY = {
-        'DIRECTIVES': {
-            'child-src': ["'self'"],
-            'connect-src': ["'self'"],
-            'default-src': ["'self'"],
-            'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
-            'frame-src': ["'self'"],
-            'img-src': ["'self'", 'data:', 'https:', 'blob:'],
-            'manifest-src': ["'self'"],
-            'media-src': ["'self'"],
-            'script-src': ["'self'", "'nonce'", "'unsafe-inline'", csp.constants.NONCE],
-            'style-src': ["'self'", 'https://fonts.googleapis.com', "'nonce'", "'unsafe-inline'", csp.constants.NONCE],
-            'worker-src': ["'self'", 'blob:']
-        }
-    }
+    CSP_DEFAULT_SRC = ["'self'"]
+    CSP_CHILD_SRC = ["'self'"]
+    CSP_CONNECT_SRC = ["'self'"]
+    CSP_FONT_SRC = ["'self'", 'https://fonts.gstatic.com', 'data:']
+    CSP_FRAME_SRC = ["'self'"]
+    CSP_IMG_SRC = ["'self'", 'data:', 'https:', 'blob:']
+    CSP_MANIFEST_SRC = ["'self'"]
+    CSP_MEDIA_SRC = ["'self'"]
+    CSP_SCRIPT_SRC = ["'self'", "'nonce'", "'unsafe-inline'", csp.constants.NONCE]
+    CSP_STYLE_SRC = ["'self'", 'https://fonts.googleapis.com', "'nonce'", "'unsafe-inline'", csp.constants.NONCE]
+    CSP_WORKER_SRC = ["'self'", 'blob:']
 
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1
