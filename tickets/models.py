@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import DEFERRED
 from django.utils import timezone
 from typing import Optional, List, Dict, Any
 from django.db.models import QuerySet
@@ -186,9 +187,9 @@ class Ticket(models.Model):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__original_status = self.status
-        self.__original_technician_name = self.technician_name
-        self.__original_forwarded_to = self.forwarded_to
+        self.__original_status = self.__dict__.get('status', DEFERRED)
+        self.__original_technician_name = self.__dict__.get('technician_name', DEFERRED)
+        self.__original_forwarded_to = self.__dict__.get('forwarded_to', DEFERRED)
 
     def __str__(self) -> str:
         """Return a human-readable representation of the ticket."""
@@ -226,12 +227,16 @@ class Ticket(models.Model):
 
         # Auto-set technician_assigned_at when technician is first assigned
         if self.technician_name and not self.technician_assigned_at:
-            if is_new or self.__original_technician_name != self.technician_name:
+            if (
+                is_new
+                or self.__original_technician_name is DEFERRED
+                or self.__original_technician_name != self.technician_name
+            ):
                 self.technician_assigned_at = timezone.now()
 
         # Auto-set solved_at when status changes to SOLVED
         if self.status == 'SOLVED' and not self.solved_at:
-            if is_new or self.__original_status != 'SOLVED':
+            if is_new or self.__original_status is DEFERRED or self.__original_status != 'SOLVED':
                 self.solved_at = timezone.now()
 
         # Reset solved_at if status changes away from SOLVED
@@ -240,7 +245,11 @@ class Ticket(models.Model):
 
         # Auto-set forwarded_at when forwarded_to is first assigned
         if self.forwarded_to and not self.forwarded_at:
-            if is_new or self.__original_forwarded_to != self.forwarded_to:
+            if (
+                is_new
+                or self.__original_forwarded_to is DEFERRED
+                or self.__original_forwarded_to != self.forwarded_to
+            ):
                 self.forwarded_at = timezone.now()
 
         # Reset forwarded_at if forwarded_to is cleared

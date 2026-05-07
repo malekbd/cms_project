@@ -39,15 +39,19 @@ class EnhancedSecurityMiddleware(SecurityMiddleware):
         """
         # Content Security Policy (CSP)
         if getattr(settings, 'CSP_ENABLED', False):
+            self_src = ["'self'"]
+            inline_src = ["'self'", "'unsafe-inline'"]
+            image_src = ["'self'", 'data:', 'https:', 'blob:']
+            font_src = ["'self'", 'data:']
             csp_directives = [
-                f"default-src {self._format_csp(settings.CSP_DEFAULT_SRC)}",
-                f"script-src {self._format_csp(settings.CSP_SCRIPT_SRC)}",
-                f"style-src {self._format_csp(settings.CSP_STYLE_SRC)}",
-                f"img-src {self._format_csp(settings.CSP_IMG_SRC)}",
-                f"font-src {self._format_csp(settings.CSP_FONT_SRC)}",
-                f"connect-src {self._format_csp(settings.CSP_CONNECT_SRC)}",
-                f"frame-src {self._format_csp(settings.CSP_FRAME_SRC)}",
-                f"media-src {self._format_csp(settings.CSP_MEDIA_SRC)}",
+                f"default-src {self._format_csp(self._get_csp_sources('default-src', self_src))}",
+                f"script-src {self._format_csp(self._get_csp_sources('script-src', inline_src))}",
+                f"style-src {self._format_csp(self._get_csp_sources('style-src', inline_src))}",
+                f"img-src {self._format_csp(self._get_csp_sources('img-src', image_src))}",
+                f"font-src {self._format_csp(self._get_csp_sources('font-src', font_src))}",
+                f"connect-src {self._format_csp(self._get_csp_sources('connect-src', self_src))}",
+                f"frame-src {self._format_csp(self._get_csp_sources('frame-src', self_src))}",
+                f"media-src {self._format_csp(self._get_csp_sources('media-src', self_src))}",
                 f"object-src 'none'",  # Disallow plugins
                 f"base-uri 'self'",
                 f"form-action 'self'",
@@ -90,8 +94,17 @@ class EnhancedSecurityMiddleware(SecurityMiddleware):
         Format CSP sources for header.
         """
         if isinstance(sources, (list, tuple)):
-            return " ".join(sources)
-        return sources
+            return " ".join(str(source) for source in sources)
+        return str(sources)
+
+    def _get_csp_sources(self, directive, default):
+        legacy_name = f"CSP_{directive.replace('-', '_').upper()}"
+        if hasattr(settings, legacy_name):
+            return getattr(settings, legacy_name)
+
+        policy = getattr(settings, 'CONTENT_SECURITY_POLICY', {})
+        directives = policy.get('DIRECTIVES', {}) if isinstance(policy, dict) else {}
+        return directives.get(directive, default)
     
     def apply_security_policies(self, request, response):
         """
