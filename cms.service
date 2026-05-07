@@ -13,6 +13,7 @@ Environment="PATH=/home/cmsuser/cms_project/venv/bin"
 Environment="DJANGO_SETTINGS_MODULE=cms_project.settings"
 Environment="PYTHONPATH=/home/cmsuser/cms_project"
 Environment="PYTHONUNBUFFERED=1"
+Environment="HOME=/run/cms"
 RuntimeDirectory=cms
 RuntimeDirectoryMode=0750
 
@@ -34,7 +35,7 @@ LockPersonality=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
 # Process management
-ExecStart=/home/cmsuser/cms_project/venv/bin/gunicorn \
+ExecStart=/home/cmsuser/cms_project/venv/bin/python -m gunicorn \
     --config /home/cmsuser/cms_project/gunicorn.conf.py \
     cms_project.wsgi:application
 ExecReload=/bin/kill -s HUP $MAINPID
