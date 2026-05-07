@@ -1,0 +1,304 @@
+{% extends 'panel/base.html' %}
+{% block title %}Branch Performance Report{% endblock %}
+{% block page_title %}Branch-wise New User Target & Performance Report{% endblock %}
+{% block page_subtitle %}Daily, monthly, and yearly tracking of new user acquisition targets{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'panel_reports' %}" class="btn-outline">📊 General Reports</a>
+<a href="{% url 'panel_new_user_tracking' %}" class="btn-outline">👥 New User Tracking</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-body" style="padding: 16px 20px;">
+        <form method="get" class="report-filter">
+            <div class="report-filter-group">
+                <label class="form-label">Report Date</label>
+                <input type="date" name="date" class="filter-input" value="{{ report_date|date:'Y-m-d' }}">
+            </div>
+            <button type="submit" class="btn-primary" style="align-self: flex-end;">📅 Update Report</button>
+            {% if report_date != today %}
+            <a href="{% url 'panel_branch_performance_report' %}" class="btn-outline" style="align-self: flex-end;">📅
+                Today</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="stats-row">
+    <div class="stat-card stat-blue">
+        <div class="stat-card-inner">
+            <div class="stat-info">
+                <span class="stat-label">Daily New Users</span>
+                <span class="stat-value">{{ total_daily }}</span>
+            </div>
+            <div class="stat-icon-wrap">📈</div>
+        </div>
+    </div>
+    <div class="stat-card stat-green">
+        <div class="stat-card-inner">
+            <div class="stat-info">
+                <span class="stat-label">Monthly Target</span>
+                <span class="stat-value">{{ total_monthly_target }}</span>
+            </div>
+            <div class="stat-icon-wrap">🎯</div>
+        </div>
+    </div>
+    <div class="stat-card stat-amber">
+        <div class="stat-card-inner">
+            <div class="stat-info">
+                <span class="stat-label">Monthly Achieved</span>
+                <span class="stat-value">{{ total_monthly_achieved }}</span>
+            </div>
+            <div class="stat-icon-wrap">✅</div>
+        </div>
+    </div>
+    <div class="stat-card stat-red">
+        <div class="stat-card-inner">
+            <div class="stat-info">
+                <span class="stat-label">Remaining Monthly</span>
+                <span class="stat-value">{{ total_remaining_monthly }}</span>
+            </div>
+            <div class="stat-icon-wrap">⏳</div>
+        </div>
+    </div>
+    <div class="stat-card stat-purple">
+        <div class="stat-card-inner">
+            <div class="stat-info">
+                <span class="stat-label">Yearly Performance</span>
+                <span class="stat-value">{{ overall_yearly_performance }}%</span>
+            </div>
+            <div class="stat-icon-wrap">📊</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Report Table -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Branch-wise Performance Details</h3>
+        <div class="card-subtitle">Report Date: {{ report_date|date:"F j, Y" }}</div>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Branch Name</th>
+                        <th>Daily New Users</th>
+                        <th>Monthly Target</th>
+                        <th>Monthly Achieved</th>
+                        <th>Remaining Monthly Target</th>
+                        <th>Yearly Target</th>
+                        <th>Yearly Achieved</th>
+                        <th>Yearly Performance (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for branch in branch_performance_data %}
+                    <tr>
+                        <td><strong>{{ branch.branch_name }}</strong></td>
+                        <td>
+                            <span
+                                class="badge {% if branch.daily_new_users > 0 %}badge-success{% else %}badge-secondary{% endif %}">
+                                {{ branch.daily_new_users }}
+                            </span>
+                        </td>
+                        <td>{{ branch.monthly_target }}</td>
+                        <td>
+                            <span
+                                class="badge {% if branch.monthly_achieved >= branch.monthly_target %}badge-success{% else %}badge-warning{% endif %}">
+                                {{ branch.monthly_achieved }}
+                            </span>
+                        </td>
+                        <td>
+                            <span
+                                class="badge {% if branch.remaining_monthly_target == 0 %}badge-success{% elif branch.remaining_monthly_target > branch.monthly_target|add:"
+                                -5" %}badge-danger{% else %}badge-warning{% endif %}">
+                                {{ branch.remaining_monthly_target }}
+                            </span>
+                        </td>
+                        <td>{{ branch.yearly_target }}</td>
+                        <td>{{ branch.yearly_achieved }}</td>
+                        <td>
+                            <div class="progress-container">
+                                {% with performance=branch.yearly_performance %}
+                                {% if performance >= 100 %}
+                                <div class="progress-bar" style="width: {{ performance }}%; background-color: #10b981;">
+                                </div>
+                                {% elif performance >= 75 %}
+                                <div class="progress-bar" style="width: {{ performance }}%; background-color: #3b82f6;">
+                                </div>
+                                {% elif performance >= 50 %}
+                                <div class="progress-bar" style="width: {{ performance }}%; background-color: #f59e0b;">
+                                </div>
+                                {% else %}
+                                <div class="progress-bar" style="width: {{ performance }}%; background-color: #ef4444;">
+                                </div>
+                                {% endif %}
+                                {% endwith %}
+                                <span class="progress-text">{{ branch.yearly_performance }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📊</div>
+                                <h3>No branch performance data available</h3>
+                                <p>No new user tickets found for the selected date.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-total-row">
+                        <td><strong>Totals</strong></td>
+                        <td><strong>{{ total_daily }}</strong></td>
+                        <td><strong>{{ total_monthly_target }}</strong></td>
+                        <td><strong>{{ total_monthly_achieved }}</strong></td>
+                        <td><strong>{{ total_remaining_monthly }}</strong></td>
+                        <td><strong>{{ total_yearly_target }}</strong></td>
+                        <td><strong>{{ total_yearly_achieved }}</strong></td>
+                        <td><strong>{{ overall_yearly_performance }}%</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics Explanation -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">📋 Report Metrics Explanation</h3>
+    </div>
+    <div class="card-body">
+        <div class="metrics-grid">
+            <div class="metric-item">
+                <div class="metric-icon">📈</div>
+                <div class="metric-info">
+                    <h4>Daily New Users</h4>
+                    <p>Number of new users added by each branch on the selected date (solved tickets with "New User"
+                        flag).</p>
+                </div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-icon">🎯</div>
+                <div class="metric-info">
+                    <h4>Monthly Target</h4>
+                    <p>Target number of new users set for each branch for the current month (configured in Branch
+                        Settings).</p>
+                </div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-icon">✅</div>
+                <div class="metric-info">
+                    <h4>Monthly Achieved</h4>
+                    <p>Total new users added by the branch in the current month (from 1st to report date).</p>
+                </div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-icon">⏳</div>
+                <div class="metric-info">
+                    <h4>Remaining Monthly Target</h4>
+                    <p>Monthly Target - Monthly Achieved. How many more new users needed to hit monthly target.</p>
+                </div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-icon">📅</div>
+                <div class="metric-info">
+                    <h4>Yearly Target</h4>
+                    <p>Calculated as Monthly Target × 12 (annual projection based on monthly target).</p>
+                </div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-icon">📊</div>
+                <div class="metric-info">
+                    <h4>Yearly Performance</h4>
+                    <p>(Yearly Achieved ÷ Yearly Target) × 100%. Shows overall annual achievement percentage.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .progress-container {
+        position: relative;
+        width: 100%;
+        height: 24px;
+        background-color: #f1f5f9;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-text {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+    }
+
+    .metric-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+        background-color: #f8fafc;
+        border-radius: 8px;
+        border-left: 4px solid #3b82f6;
+    }
+
+    .metric-icon {
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+
+    .metric-info h4 {
+        margin: 0 0 4px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .metric-info p {
+        margin: 0;
+        font-size: 13px;
+        color: #64748b;
+        line-height: 1.4;
+    }
+
+    .table-total-row {
+        background-color: #f1f5f9;
+        font-weight: 600;
+    }
+
+    .table-total-row td {
+        padding: 12px 16px;
+        border-top: 2px solid #cbd5e1;
+    }
+</style>
+{% endblock %}

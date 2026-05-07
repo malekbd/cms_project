@@ -113,6 +113,111 @@ def get_scoped_ticket_or_404(request, pk):
     return get_object_or_404(scope_tickets_for_user(Ticket.objects.all(), request.user), pk=pk)
 
 
+def calculate_branch_performance_report(user, target_date=None):
+    """
+    Calculate branch-wise performance metrics for new user acquisition.
+    
+    Returns a list of dictionaries with columns:
+    - Branch Name
+    - Daily New Users (new users added on target_date)
+    - Monthly Target (from BranchOption.monthly_target)
+    - Remaining Monthly Target (monthly target - new users this month)
+    - Yearly Target (monthly_target * 12)
+    - Yearly Achieved (new users in current year)
+    - Yearly Performance (%) (yearly_achieved / yearly_target * 100)
+    
+    If target_date is None, uses current date.
+    """
+    if target_date is None:
+        target_date = get_current_date()
+    
+    # Get current year and month
+    current_year = target_date.year
+    current_month = target_date.month
+    
+    # Get visible branches for the user
+    branches = get_visible_branch_options(user)
+    
+    # Get all solved new user tickets for performance calculations
+    all_new_user_tickets = scope_tickets_for_user(
+        Ticket.objects.filter(
+            is_new_user=True,
+            status='SOLVED'
+        ),
+        user
+    )
+    
+    # Calculate daily new users per branch
+    daily_new_users = {}
+    daily_tickets = all_new_user_tickets.filter(date=target_date)
+    for ticket in daily_tickets:
+        branch_name = ticket.branch
+        daily_new_users[branch_name] = daily_new_users.get(branch_name, 0) + 1
+    
+    # Calculate monthly new users per branch (current month)
+    monthly_new_users = {}
+    month_start = date(current_year, current_month, 1)
+    if current_month == 12:
+        month_end = date(current_year + 1, 1, 1) - timedelta(days=1)
+    else:
+        month_end = date(current_year, current_month + 1, 1) - timedelta(days=1)
+    
+    monthly_tickets = all_new_user_tickets.filter(date__gte=month_start, date__lte=month_end)
+    for ticket in monthly_tickets:
+        branch_name = ticket.branch
+        monthly_new_users[branch_name] = monthly_new_users.get(branch_name, 0) + 1
+    
+    # Calculate yearly new users per branch (current year)
+    yearly_new_users = {}
+    year_start = date(current_year, 1, 1)
+    year_end = date(current_year, 12, 31)
+    
+    yearly_tickets = all_new_user_tickets.filter(date__gte=year_start, date__lte=year_end)
+    for ticket in yearly_tickets:
+        branch_name = ticket.branch
+        yearly_new_users[branch_name] = yearly_new_users.get(branch_name, 0) + 1
+    
+    # Build report for each branch
+    report_data = []
+    for branch in branches:
+        # Get branch display name
+        branch_display = branch.display_name or branch.name.replace('_', ' ').title()
+        
+        # Get targets
+        monthly_target = branch.monthly_target or 0
+        yearly_target = monthly_target * 12
+        
+        # Get achievements
+        daily_achieved = daily_new_users.get(branch.name, 0) or daily_new_users.get(branch.display_name, 0) or 0
+        monthly_achieved = monthly_new_users.get(branch.name, 0) or monthly_new_users.get(branch.display_name, 0) or 0
+        yearly_achieved = yearly_new_users.get(branch.name, 0) or yearly_new_users.get(branch.display_name, 0) or 0
+        
+        # Calculate remaining monthly target
+        remaining_monthly = max(0, monthly_target - monthly_achieved)
+        
+        # Calculate yearly performance percentage
+        yearly_performance = 0
+        if yearly_target > 0:
+            yearly_performance = round((yearly_achieved / yearly_target) * 100, 2)
+        
+        report_data.append({
+            'branch_name': branch_display,
+            'branch_key': branch.name,
+            'daily_new_users': daily_achieved,
+            'monthly_target': monthly_target,
+            'monthly_achieved': monthly_achieved,
+            'remaining_monthly_target': remaining_monthly,
+            'yearly_target': yearly_target,
+            'yearly_achieved': yearly_achieved,
+            'yearly_performance': yearly_performance,
+        })
+    
+    # Sort by branch name
+    report_data.sort(key=lambda x: x['branch_name'])
+    
+    return report_data
+
+
 def require_superuser(request):
     if request.user.is_superuser:
         return None
@@ -137,27 +242,33 @@ def build_dashboard_payload(user):
     trend_start = today - timedelta(days=13)
     last_week_start = week_ago - timedelta(days=7)
 
+    # Project start date: April 1 of the current year
+    april_start = date(today.year, 4, 1)
+
     # Get base queryset once
     all_tickets = scope_tickets_for_user(Ticket.objects.all(), user)
+    # Tickets from project start onward
+    project_tickets = all_tickets.filter(date__gte=april_start)
     
     # Use a single complex query to get multiple aggregations
     from django.db.models import Case, When, IntegerField, Sum, Count
     
     # Get status counts, today count, week count, month count in fewer queries
-    # First, get aggregated data in a more efficient way
-    status_agg = dict(all_tickets.values_list('status').annotate(count=Count('sn')))
+    # First, get aggregated data from project tickets
+    status_agg = dict(project_tickets.values_list('status').annotate(count=Count('sn')))
     
     solved = status_agg.get('SOLVED', 0)
     pending = status_agg.get('PENDING', 0)
     time_taken = status_agg.get('TIME TAKEN', 0)
     no_response = status_agg.get('No Response', 0)
-    total = sum(status_agg.values())
+    total = project_tickets.count()
     
     # Get date-based counts using conditional aggregation (more efficient)
-    today_count = all_tickets.filter(date=today).count()
-    week_count = all_tickets.filter(date__gte=week_ago).count()
-    month_count = all_tickets.filter(date__gte=month_ago).count()
-    last_week_count = all_tickets.filter(date__gte=last_week_start, date__lt=week_ago).count()
+    today_count = project_tickets.filter(date=today).count()
+    week_count = project_tickets.filter(date__gte=week_ago).count()
+    # Month count: current calendar month (May)
+    month_count = project_tickets.filter(date__year=today.year, date__month=today.month).count()
+    last_week_count = project_tickets.filter(date__gte=last_week_start, date__lt=week_ago).count()
     
     if last_week_count > 0:
         week_trend = round(((week_count - last_week_count) / last_week_count) * 100, 1)
@@ -168,7 +279,7 @@ def build_dashboard_payload(user):
 
     # Get daily trend data
     daily_rows = dict(
-        all_tickets.filter(date__gte=trend_start)
+        project_tickets.filter(date__gte=trend_start)
         .values('date')
         .annotate(count=Count('sn'))
         .values_list('date', 'count')
@@ -181,11 +292,11 @@ def build_dashboard_payload(user):
     # Get top data in parallel queries (already efficient)
     top_issues = [
         {'issue': row['issue'] or 'No Issue', 'count': row['count']}
-        for row in all_tickets.values('issue').annotate(count=Count('sn')).order_by('-count')[:10]
+        for row in project_tickets.values('issue').annotate(count=Count('sn')).order_by('-count')[:10]
     ]
     
     top_technicians = list(
-        all_tickets.exclude(technician_name__isnull=True)
+        project_tickets.exclude(technician_name__isnull=True)
         .exclude(technician_name='')
         .values('technician_name')
         .annotate(count=Count('sn'))
@@ -194,7 +305,7 @@ def build_dashboard_payload(user):
     
     branch_stats = [
         {'branch': format_branch_name(row['branch']), 'count': row['count']}
-        for row in all_tickets.values('branch').annotate(count=Count('sn')).order_by('-count')[:10]
+        for row in project_tickets.values('branch').annotate(count=Count('sn')).order_by('-count')[:10]
     ]
 
     status_data = [
@@ -213,7 +324,7 @@ def build_dashboard_payload(user):
             'status': ticket.status,
             'detail_url': reverse('panel_ticket_detail', args=[ticket.sn]),
         }
-        for ticket in all_tickets.only('sn', 'user_name', 'issue', 'status', 'created_at').order_by('-created_at')[:10]
+        for ticket in project_tickets.only('sn', 'user_name', 'issue', 'status', 'created_at').order_by('-created_at')[:10]
     ]
 
     payload = {
@@ -546,6 +657,65 @@ def panel_reports(request):
         'daily_values': json.dumps(daily_values),
     }
     return render(request, 'panel/reports.html', context)
+
+
+@login_required
+def panel_branch_performance_report(request):
+    """
+    Branch-wise New User Target & Performance Report
+    
+    Shows dashboard with columns:
+    - Branch Name
+    - Daily New Users
+    - Monthly Target
+    - Remaining Monthly Target
+    - Yearly Target
+    - Yearly Achieved
+    - Yearly Performance (%)
+    """
+    today = get_current_date()
+    
+    # Optional date parameter for viewing reports for a specific date
+    date_param = request.GET.get('date', '')
+    if date_param:
+        try:
+            target_date = date.fromisoformat(date_param)
+        except ValueError:
+            target_date = today
+    else:
+        target_date = today
+    
+    # Calculate branch performance data
+    branch_performance_data = calculate_branch_performance_report(request.user, target_date)
+    
+    # Calculate totals for summary
+    total_daily = sum(item['daily_new_users'] for item in branch_performance_data)
+    total_monthly_target = sum(item['monthly_target'] for item in branch_performance_data)
+    total_monthly_achieved = sum(item['monthly_achieved'] for item in branch_performance_data)
+    total_remaining_monthly = sum(item['remaining_monthly_target'] for item in branch_performance_data)
+    total_yearly_target = sum(item['yearly_target'] for item in branch_performance_data)
+    total_yearly_achieved = sum(item['yearly_achieved'] for item in branch_performance_data)
+    
+    # Calculate overall yearly performance percentage
+    overall_yearly_performance = 0
+    if total_yearly_target > 0:
+        overall_yearly_performance = round((total_yearly_achieved / total_yearly_target) * 100, 2)
+    
+    context = {
+        'active_page': 'reports',
+        'report_date': target_date,
+        'branch_performance_data': branch_performance_data,
+        'total_daily': total_daily,
+        'total_monthly_target': total_monthly_target,
+        'total_monthly_achieved': total_monthly_achieved,
+        'total_remaining_monthly': total_remaining_monthly,
+        'total_yearly_target': total_yearly_target,
+        'total_yearly_achieved': total_yearly_achieved,
+        'overall_yearly_performance': overall_yearly_performance,
+        'today': today,
+    }
+    
+    return render(request, 'panel/branch_performance_report.html', context)
 
 
 @login_required

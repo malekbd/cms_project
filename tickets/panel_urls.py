@@ -24,6 +24,7 @@ urlpatterns = [
     path('reports/', panel_views.panel_reports, name='panel_reports'),
     path('reports/export/', panel_views.panel_export_csv, name='panel_export_csv'),
     path('new-users/', panel_views.panel_new_user_tracking, name='panel_new_user_tracking'),
+    path('branch-performance/', panel_views.panel_branch_performance_report, name='panel_branch_performance_report'),
 
     # Users
     path('users/', panel_views.panel_users, name='panel_users'),
