@@ -72,7 +72,7 @@ For deployment notifications to Slack.
 3. Create a webhook for your channel
 4. Copy the webhook URL
 
-**Example:** `https://hooks.slack.com/services/...` (replace with your actual webhook)
+**Example:** `https://hooks.slack.com/services/...` (replace with your actual webhook URL)
 
 ## Setting Up Secrets in GitHub
 
