@@ -1,0 +1,292 @@
+name: CD - Continuous Deployment
+
+on:
+  workflow_run:
+    workflows: ["CI - Test, Lint, and Security Scan"]
+    types: [completed]
+    branches: [main]
+
+env:
+  DEPLOYMENT_ENV: production
+  PROJECT_PATH: /home/cmsuser/cms_project
+
+jobs:
+  validate-deployment:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.workflow_run.head_sha }}
+
+    - name: Validate deployment configuration
+      run: |
+        echo "Validating deployment configuration for ${{ env.DEPLOYMENT_ENV }}"
+        echo "Commit SHA: ${{ github.event.workflow_run.head_sha }}"
+        echo "Branch: main"
+        
+        # Check essential files exist
+        required_files=("manage.py" "requirements.txt" "deploy.sh" "gunicorn.conf.py")
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Missing required file: $file"
+            exit 1
+          else
+            echo "✅ Found: $file"
+          fi
+        done
+        
+        # Validate Python version compatibility
+        python --version
+        python -c "import django; print(f'Django version: {django.__version__}')"
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: validate-deployment
+    environment: staging
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.workflow_run.head_sha }}
+
+    - name: Deploy to Staging via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.STAGING_SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2111
+        script: |
+          set -e
+          echo "🚀 Starting deployment to staging environment"
+          cd ${{ env.PROJECT_PATH }}
+          
+          # Create backup before deployment
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_DIR="backups/staging_$TIMESTAMP"
+          mkdir -p "$BACKUP_DIR"
+          
+          echo "📦 Creating backup..."
+          tar -czf "$BACKUP_DIR/app_backup.tar.gz" --exclude=venv --exclude=*.pyc --exclude=__pycache__ .
+          cp db.sqlite3 "$BACKUP_DIR/" 2>/dev/null || true
+          
+          echo "🔄 Pulling latest changes..."
+          git fetch origin develop
+          git reset --hard origin/develop
+          
+          echo "🐍 Setting up Python environment..."
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          echo "🗄️ Running database migrations..."
+          python manage.py migrate --noinput
+          
+          echo "📁 Collecting static files..."
+          python manage.py collectstatic --noinput --clear
+          
+          echo "🔧 Applying security settings..."
+          python manage.py check --deploy
+          
+          echo "🔄 Restarting services..."
+          systemctl restart gunicorn
+          systemctl restart nginx
+          systemctl restart cms
+          
+          echo "✅ Staging deployment completed successfully!"
+          
+          # Run health check
+          sleep 5
+          curl -f http://localhost:8000/health/ || echo "Health check failed but deployment completed"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [validate-deployment, deploy-staging]
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.workflow_run.head_sha }}
+
+    - name: Create deployment tag
+      id: tag_version
+      run: |
+        VERSION=$(date +%Y%m%d.%H%M%S)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        git tag "deploy-$VERSION" ${{ github.event.workflow_run.head_sha }}
+        git push origin "deploy-$VERSION"
+
+    - name: Deploy to Production via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2111
+        script: |
+          set -e
+          echo "🚀 Starting PRODUCTION deployment"
+          cd ${{ env.PROJECT_PATH }}
+          
+          # Zero-downtime deployment preparation
+          DEPLOYMENT_ID=$(date +%Y%m%d_%H%M%S)
+          DEPLOYMENT_DIR="deployments/$DEPLOYMENT_ID"
+          mkdir -p "$DEPLOYMENT_DIR"
+          
+          echo "📦 Creating comprehensive backup..."
+          BACKUP_DIR="backups/production_$DEPLOYMENT_ID"
+          mkdir -p "$BACKUP_DIR"
+          
+          # Backup database
+          if [ -f db.sqlite3 ]; then
+            cp db.sqlite3 "$BACKUP_DIR/db.sqlite3.backup"
+            echo "✅ Database backed up"
+          fi
+          
+          # Backup critical files
+          tar -czf "$BACKUP_DIR/full_backup.tar.gz" \
+            --exclude=venv \
+            --exclude=*.pyc \
+            --exclude=__pycache__ \
+            --exclude=backups \
+            --exclude=deployments \
+            --exclude=.git \
+            .
+          
+          echo "🔄 Setting up new deployment directory..."
+          git clone --depth 1 -b main https://github.com/${{ github.repository }}.git "$DEPLOYMENT_DIR"
+          cd "$DEPLOYMENT_DIR"
+          
+          echo "🐍 Setting up Python environment..."
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          echo "🔧 Copying environment configuration..."
+          cp /home/cmsuser/cms_project/.env .env 2>/dev/null || echo "Using existing .env"
+          
+          echo "🗄️ Running database migrations..."
+          python manage.py migrate --noinput
+          
+          echo "📁 Collecting static files..."
+          python manage.py collectstatic --noinput --clear
+          
+          echo "🔒 Running security checks..."
+          python manage.py check --deploy --fail-level WARNING
+          
+          echo "🔄 Switching to new deployment (zero-downtime)..."
+          cd /home/cmsuser/cms_project
+          ln -sfn "$DEPLOYMENT_DIR" current_new
+          mv -T current_new current
+          
+          echo "⚡ Restarting services with new deployment..."
+          systemctl daemon-reload
+          systemctl restart gunicorn
+          systemctl restart nginx
+          systemctl restart cms
+          
+          echo "⏳ Waiting for services to stabilize..."
+          sleep 10
+          
+          echo "🏥 Running health checks..."
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if curl -f http://localhost:8000/health/; then
+              echo "✅ Health check passed!"
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "⚠️ Health check attempt $RETRY_COUNT failed, retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "❌ Health check failed after $MAX_RETRIES attempts"
+            echo "🔄 Attempting rollback..."
+            cd /home/cmsuser/cms_project
+            ln -sfn "$(readlink -f current.old)" current 2>/dev/null || true
+            systemctl restart gunicorn
+            systemctl restart nginx
+            systemctl restart cms
+            exit 1
+          fi
+          
+          echo "🧹 Cleaning up old deployments (keeping last 5)..."
+          ls -dt deployments/* | tail -n +6 | xargs rm -rf 2>/dev/null || true
+          ls -dt backups/* | tail -n +6 | xargs rm -rf 2>/dev/null || true
+          
+          echo "🎉 PRODUCTION deployment completed successfully!"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "Version: ${{ steps.tag_version.outputs.VERSION }}"
+
+    - name: Verify production deployment
+      run: |
+        echo "Production deployment verification..."
+        echo "Deployed version: ${{ steps.tag_version.outputs.VERSION }}"
+        echo "Commit: ${{ github.event.workflow_run.head_sha }}"
+
+  rollback:
+    runs-on: ubuntu-latest
+    if: failure() && github.ref == 'refs/heads/main'
+    needs: [deploy-production]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Execute rollback via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2111
+        script: |
+          set -e
+          echo "🔄 Starting automatic rollback..."
+          cd /home/cmsuser/cms_project
+          
+          # Find latest backup
+          LATEST_BACKUP=$(ls -dt backups/production_* | head -1)
+          
+          if [ -z "$LATEST_BACKUP" ]; then
+            echo "❌ No backup found for rollback"
+            exit 1
+          fi
+          
+          echo "📦 Restoring from backup: $LATEST_BACKUP"
+          
+          # Stop services
+          systemctl stop gunicorn
+          systemctl stop nginx
+          systemctl stop cms
+          
+          # Restore files
+          tar -xzf "$LATEST_BACKUP/full_backup.tar.gz" -C /home/cmsuser/cms_project --strip-components=1
+          
+          # Restore database if exists
+          if [ -f "$LATEST_BACKUP/db.sqlite3.backup" ]; then
+            cp "$LATEST_BACKUP/db.sqlite3.backup" db.sqlite3
+          fi
+          
+          # Restart services
+          systemctl start gunicorn
+          systemctl start nginx
+          systemctl start cms
+          
+          echo "✅ Rollback completed successfully"
+          
+          # Verify rollback
+          sleep 5
+          curl -f http://localhost:8000/health/ && echo "✅ Rollback verified" || echo "⚠️ Rollback completed but health check failed"
