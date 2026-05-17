@@ -27,7 +27,7 @@ echo "6. Clearing stale Python bytecode..."
 su -s /bin/bash cmsuser -c "find $PROJECT_DIR -name '*.pyc' -delete && find $PROJECT_DIR -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true"
 
 echo "7. Testing Django imports as cmsuser..."
-su -s /bin/bash cmsuser -c "cd $PROJECT_DIR && ./venv/bin/python -c 'import django; django.setup(); print(\"Django OK\")'"
+su -s /bin/bash cmsuser -c "cd $PROJECT_DIR && ./venv/bin/python -c 'import os; os.environ.setdefault(\"DJANGO_SETTINGS_MODULE\", \"cms_project.settings\"); import django; django.setup(); print(\"Django OK\")'"
 
 echo "8. Running Django system checks..."
 su -s /bin/bash cmsuser -c "cd $PROJECT_DIR && ./venv/bin/python manage.py check --deploy 2>&1 | head -30"
