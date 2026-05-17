@@ -76,7 +76,11 @@ class ErrorHandlingMiddleware:
 
 
 class SecurityHeadersMiddleware:
-    """Middleware to add security headers to responses including CSP."""
+    """Middleware to add security headers to responses.
+    
+    CSP headers are handled by csp.middleware.CSPMiddleware (django-csp)
+    and configured via CONTENT_SECURITY_POLICY in settings.py.
+    """
     
     def __init__(self, get_response):
         self.get_response = get_response
@@ -91,11 +95,6 @@ class SecurityHeadersMiddleware:
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
         
-        # Add CSP header if enabled
-        if getattr(settings, 'CSP_ENABLED', False):
-            csp_header = self._build_csp_header()
-            response['Content-Security-Policy'] = csp_header
-        
         # HSTS header for production
         if not settings.DEBUG:
             response['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
@@ -106,51 +105,3 @@ class SecurityHeadersMiddleware:
         response['Cross-Origin-Resource-Policy'] = 'same-origin'
         
         return response
-    
-    def _build_csp_header(self):
-        """Build Content Security Policy header."""
-        directives = []
-        
-        # Default source
-        if hasattr(settings, 'CSP_DEFAULT_SRC'):
-            directives.append(f"default-src {' '.join(settings.CSP_DEFAULT_SRC)}")
-        
-        # Script sources
-        if hasattr(settings, 'CSP_SCRIPT_SRC'):
-            directives.append(f"script-src {' '.join(settings.CSP_SCRIPT_SRC)}")
-        
-        # Style sources
-        if hasattr(settings, 'CSP_STYLE_SRC'):
-            directives.append(f"style-src {' '.join(settings.CSP_STYLE_SRC)}")
-        
-        # Image sources
-        if hasattr(settings, 'CSP_IMG_SRC'):
-            directives.append(f"img-src {' '.join(settings.CSP_IMG_SRC)}")
-        
-        # Font sources
-        if hasattr(settings, 'CSP_FONT_SRC'):
-            directives.append(f"font-src {' '.join(settings.CSP_FONT_SRC)}")
-        
-        # Connect sources
-        if hasattr(settings, 'CSP_CONNECT_SRC'):
-            directives.append(f"connect-src {' '.join(settings.CSP_CONNECT_SRC)}")
-        
-        # Frame sources
-        if hasattr(settings, 'CSP_FRAME_SRC'):
-            directives.append(f"frame-src {' '.join(settings.CSP_FRAME_SRC)}")
-        else:
-            directives.append("frame-src 'none'")
-        
-        # Object sources
-        directives.append("object-src 'none'")
-        
-        # Base URI
-        directives.append("base-uri 'self'")
-        
-        # Form action
-        directives.append("form-action 'self'")
-        
-        # Frame ancestors
-        directives.append("frame-ancestors 'none'")
-        
-        return '; '.join(directives)

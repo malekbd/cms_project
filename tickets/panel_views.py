@@ -250,9 +250,6 @@ def build_dashboard_payload(user):
     # Tickets from project start onward
     project_tickets = all_tickets.filter(date__gte=april_start)
     
-    # Use a single complex query to get multiple aggregations
-    from django.db.models import Case, When, IntegerField, Sum, Count
-    
     # Get status counts, today count, week count, month count in fewer queries
     # First, get aggregated data from project tickets
     status_agg = dict(project_tickets.values_list('status').annotate(count=Count('sn')))
@@ -494,15 +491,15 @@ def panel_add_ticket(request):
             msg = form.cleaned_data.get('remark') or f"Ticket created with status: {ticket.status}"
             TicketRemark.objects.create(ticket=ticket, status=ticket.status, remark=msg, created_by=request.user.username)
             messages.success(request, f'Ticket #{ticket.sn} created!')
+            # Use saved instance flags — reliable after form.save()
+            if ticket.is_partner:
+                return redirect('panel_partner_tickets')
+            if ticket.is_new_user:
+                return redirect('panel_new_user_tracking')
+            return redirect('panel_tickets')
         else:
             messages.error(request, 'Error creating ticket. Please check the fields.')
 
-    is_p = request.POST.get('is_partner') == 'True'
-    is_new_user = request.POST.get('is_new_user') in ['on', 'true', 'True', True]
-    if is_p:
-        return redirect('panel_partner_tickets')
-    if is_new_user:
-        return redirect('panel_new_user_tracking')
     return redirect('panel_tickets')
 
 
@@ -544,7 +541,11 @@ def panel_ticket_detail(request, pk):
 def panel_update_status(request, pk):
     if request.method == 'POST':
         ticket = get_scoped_ticket_or_404(request, pk)
-        new_status = json.loads(request.body).get('status')
+        try:
+            data = json.loads(request.body)
+        except (json.JSONDecodeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'Invalid request data.'}, status=400)
+        new_status = data.get('status')
         if new_status in dict(STATUS_CHOICES):
             if new_status == 'SOLVED':
                 if ticket.is_new_user:

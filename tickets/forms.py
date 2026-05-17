@@ -84,16 +84,17 @@ class TicketForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Detect partner status from data (POST), initial, or instance
+        # Detect partner/new-user status from data (POST), initial, or instance
+        _true_values = ('True', 'true', 'on', True)
         is_partner_form = (
-            (self.data.get('is_partner') in ['True', 'on', True]) or
-            self.initial.get('is_partner', False) or 
-            (self.instance and getattr(self.instance, 'is_partner', False))
+            (self.data.get('is_partner') in _true_values) or
+            bool(self.initial.get('is_partner', False)) or
+            bool(self.instance and getattr(self.instance, 'is_partner', False))
         )
         is_new_user_form = (
-            (self.data.get('is_new_user') in ['True', 'true', 'on', True]) or
-            self.initial.get('is_new_user', False) or
-            (self.instance and getattr(self.instance, 'is_new_user', False))
+            (self.data.get('is_new_user') in _true_values) or
+            bool(self.initial.get('is_new_user', False)) or
+            bool(self.instance and getattr(self.instance, 'is_new_user', False))
         )
 
         # Fields are optional at the form level to allow custom validation in clean()
@@ -152,7 +153,7 @@ class TicketForm(forms.ModelForm):
                 widget=forms.Select(attrs={'class': 'form-select'})
             )
 
-        elif is_new_user_form:
+        if is_new_user_form:
             new_user_issue_choices = list(NEW_USER_ISSUE_CHOICES)
             current_issue = (self.instance.issue or '').strip() if self.instance else ''
             if current_issue and current_issue not in dict(new_user_issue_choices):
