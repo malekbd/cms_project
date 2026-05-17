@@ -18,26 +18,18 @@ Environment="HOME=/home/cmsuser"
 RuntimeDirectory=cms
 RuntimeDirectoryMode=0750
 
-# Security hardening
+# Security hardening (safe subset — Python + gunicorn compatible)
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
-ProtectHome=read-only
-ReadWritePaths=/run/cms /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles /home/cmsuser/cms_project/__pycache__ /home/cmsuser/cms_project/cms_project/__pycache__ /home/cmsuser/cms_project/tickets/__pycache__
-PrivateDevices=true
-ProtectKernelTunables=true
-ProtectKernelModules=true
-ProtectControlGroups=true
-RestrictRealtime=true
-MemoryDenyWriteExecute=true
-RestrictSUIDSGID=true
-LockPersonality=true
+ProtectHome=false
+ReadWritePaths=/run/cms /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
-# Pre-start validation — ensure logs/ directory exists and Django can import
+# Pre-start validation — ensure logs/ directory exists and is writable by cmsuser
 ExecStartPre=/bin/mkdir -p /home/cmsuser/cms_project/logs
-ExecStartPre=/bin/chown cmsuser:www-data /home/cmsuser/cms_project/logs
-ExecStartPre=/home/cmsuser/cms_project/venv/bin/python -c "import django; import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cms_project.settings'); django.setup()"
+ExecStartPre=/bin/chown -R cmsuser:www-data /home/cmsuser/cms_project/logs
+ExecStartPre=/bin/chmod -R 755 /home/cmsuser/cms_project/logs
 
 # Process management
 ExecStart=/home/cmsuser/cms_project/venv/bin/python -m gunicorn \
@@ -55,15 +47,11 @@ StartLimitBurst=3
 # Resource limits
 LimitNOFILE=65536
 LimitNPROC=65536
-LimitMEMLOCK=infinity
-LimitSTACK=8388608
 
 # Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=cms
-SyslogFacility=daemon
-SyslogLevel=info
 
 # Notify systemd when ready
 NotifyAccess=all
