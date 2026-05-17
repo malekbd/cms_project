@@ -61,6 +61,18 @@ info() {
     echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] INFO: $1${NC}"
 }
 
+read_env_value() {
+    local key="$1"
+    local env_file="$PROJECT_DIR/.env"
+
+    if [ ! -f "$env_file" ]; then
+        return 0
+    fi
+
+    grep -E "^${key}=" "$env_file" | tail -n 1 | cut -d= -f2- \
+        | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+}
+
 # Function to check prerequisites
 check_prerequisites() {
     log "Checking prerequisites..."
@@ -98,25 +110,33 @@ create_backup() {
     
     # Backup database
     if command -v pg_dump &> /dev/null; then
-        DB_NAME=$(grep -o "DB_NAME=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
-        DB_USER=$(grep -o "DB_USER=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
-        DB_HOST=$(grep -o "DB_HOST=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
-        DB_PORT=$(grep -o "DB_PORT=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
+        DATABASE_URL=$(read_env_value "DATABASE_URL")
+        DB_NAME=$(read_env_value "DB_NAME")
+        DB_USER=$(read_env_value "DB_USER")
+        DB_HOST=$(read_env_value "DB_HOST")
+        DB_PORT=$(read_env_value "DB_PORT")
+        DB_PASSWORD=$(read_env_value "DB_PASSWORD")
         
-        if [ -n "$DB_NAME" ]; then
+        if [ -n "$DATABASE_URL" ]; then
+            if pg_dump "$DATABASE_URL" > "$BACKUP_DIR/db_backup_$TIMESTAMP.sql" 2>/dev/null; then
+                log "Database backup created from DATABASE_URL: $BACKUP_DIR/db_backup_$TIMESTAMP.sql"
+            else
+                warn "Database backup failed. Continuing without backup."
+                rm -f "$BACKUP_DIR/db_backup_$TIMESTAMP.sql"
+            fi
+        elif [ -n "$DB_NAME" ]; then
             # Build pg_dump command with connection parameters
-            PG_DUMP_CMD="pg_dump"
-            [ -n "$DB_USER" ] && PG_DUMP_CMD="$PG_DUMP_CMD -U $DB_USER"
-            [ -n "$DB_HOST" ] && PG_DUMP_CMD="$PG_DUMP_CMD -h $DB_HOST"
-            [ -n "$DB_PORT" ] && PG_DUMP_CMD="$PG_DUMP_CMD -p $DB_PORT"
+            PG_DUMP_CMD=(pg_dump)
+            [ -n "$DB_USER" ] && PG_DUMP_CMD+=("-U" "$DB_USER")
+            [ -n "$DB_HOST" ] && PG_DUMP_CMD+=("-h" "$DB_HOST")
+            [ -n "$DB_PORT" ] && PG_DUMP_CMD+=("-p" "$DB_PORT")
             
             # Set PGPASSWORD if DB_PASSWORD is available
-            DB_PASSWORD=$(grep -o "DB_PASSWORD=[^ ]*" "$PROJECT_DIR/.env" | cut -d= -f2)
             if [ -n "$DB_PASSWORD" ]; then
                 export PGPASSWORD="$DB_PASSWORD"
             fi
             
-            if $PG_DUMP_CMD "$DB_NAME" > "$BACKUP_DIR/db_backup_$TIMESTAMP.sql" 2>/dev/null; then
+            if "${PG_DUMP_CMD[@]}" "$DB_NAME" > "$BACKUP_DIR/db_backup_$TIMESTAMP.sql" 2>/dev/null; then
                 log "Database backup created: $BACKUP_DIR/db_backup_$TIMESTAMP.sql"
             else
                 warn "Database backup failed. Continuing without backup."
@@ -213,6 +233,15 @@ collect_static() {
     log "Static files collected"
 }
 
+install_systemd_service() {
+    if [ -f "$PROJECT_DIR/cms.service" ] && command -v systemctl &> /dev/null; then
+        log "Installing systemd service definition..."
+        sudo cp "$PROJECT_DIR/cms.service" /etc/systemd/system/cms.service
+        sudo systemctl daemon-reload
+        log "Systemd service definition installed"
+    fi
+}
+
 # Function to run tests
 run_tests() {
     log "Running tests..."
@@ -231,6 +260,7 @@ run_tests() {
 # Function to restart services
 restart_services() {
     log "Restarting services..."
+    install_systemd_service
     
     # Restart or start Gunicorn
     if systemctl cat cms.service >/dev/null 2>&1; then
@@ -300,6 +330,9 @@ setup_deployment_structure() {
     mkdir -p "$DEPLOYMENTS_DIR"
     mkdir -p "$BACKUP_DIR"
     mkdir -p "$LOG_DIR"
+    mkdir -p "$PROJECT_DIR/media"
+    mkdir -p "$PROJECT_DIR/staticfiles"
+    chown -R cmsuser:www-data "$LOG_DIR" "$PROJECT_DIR/media" "$PROJECT_DIR/staticfiles" 2>/dev/null || true
     
     # Create current symlink if it doesn't exist
     if [ ! -L "$CURRENT_LINK" ]; then

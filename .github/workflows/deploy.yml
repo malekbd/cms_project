@@ -158,9 +158,12 @@ jobs:
           
           # Restart services
           echo "⚡ Restarting services..."
-          systemctl daemon-reload
-          systemctl restart cms
-          systemctl reload nginx
+          if [ -f cms.service ]; then
+            sudo cp cms.service /etc/systemd/system/cms.service
+          fi
+          sudo systemctl daemon-reload
+          sudo systemctl restart cms
+          sudo systemctl reload nginx
           
           # Health check
           echo "🏥 Performing health check..."

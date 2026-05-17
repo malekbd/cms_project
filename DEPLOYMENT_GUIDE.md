@@ -99,17 +99,22 @@ sudo nano /etc/systemd/system/cms.service
 ```ini
 [Unit]
 Description=CMS Django Project
-After=network.target
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target postgresql.service redis-server.service
 
 [Service]
 Type=notify
 User=cmsuser
 Group=www-data
 WorkingDirectory=/home/cmsuser/cms_project
-Environment=PATH=/home/cmsuser/cms_project/venv/bin
+Environment="PATH=/home/cmsuser/cms_project/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="DJANGO_SETTINGS_MODULE=cms_project.settings"
 RuntimeDirectory=cms
 RuntimeDirectoryMode=0750
-ExecStart=/home/cmsuser/cms_project/venv/bin/gunicorn --config /home/cmsuser/cms_project/gunicorn.conf.py cms_project.wsgi:application
+ExecStartPre=+/bin/mkdir -p /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
+ExecStartPre=+/bin/chown -R cmsuser:www-data /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
+ExecStartPre=+/bin/chmod -R 755 /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
+ExecStart=/home/cmsuser/cms_project/venv/bin/python -m gunicorn --config /home/cmsuser/cms_project/gunicorn.conf.py cms_project.wsgi:application
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
 Restart=on-failure

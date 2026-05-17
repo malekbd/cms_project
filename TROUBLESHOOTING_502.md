@@ -96,6 +96,13 @@ ls -la /run/cms/cms.sock
 
 5. If your Nginx worker user is not `www-data`, set `Group=` in `cms.service` and `GUNICORN_GROUP`/`group` in `gunicorn.conf.py` to the actual Nginx group.
 
+6. If `systemctl status cms` shows an `ExecStartPre` ownership error, reinstall the updated service file so the pre-start directory fixes run with systemd privileges:
+   ```bash
+   sudo cp /home/cmsuser/cms_project/cms.service /etc/systemd/system/cms.service
+   sudo systemctl daemon-reload
+   sudo systemctl restart cms
+   ```
+
 **Legacy project-root socket fallback:**
 If you must keep `/home/cmsuser/cms_project/cms.sock`, the service needs write access to the project root, because Gunicorn must create and remove the socket file:
    ```bash
@@ -120,7 +127,21 @@ If you must keep `/home/cmsuser/cms_project/cms.sock`, the service needs write a
 **Fix:**
 1. Check database settings in `.env`:
    ```bash
-   cat .env | grep DB_
+   grep -E '^(DATABASE_URL|DB_)' .env
+   ```
+
+   Production supports either one `DATABASE_URL` value:
+   ```bash
+   DATABASE_URL=postgresql://cmsuser:strong_password@localhost:5432/cms_project
+   ```
+
+   Or separate values:
+   ```bash
+   DB_NAME=cms_project
+   DB_USER=cmsuser
+   DB_PASSWORD=strong_password
+   DB_HOST=localhost
+   DB_PORT=5432
    ```
 
 2. Test database connection:

@@ -5,6 +5,11 @@ from urllib.parse import urlparse, urlunparse
 from decouple import config
 import csp.constants
 
+try:
+    import dj_database_url
+except ImportError:
+    dj_database_url = None
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY')
@@ -165,6 +170,69 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'cms_project.wsgi.application'
 
+
+def postgres_options(application_name):
+    return {
+        'connect_timeout': 5,
+        'keepalives': 1,
+        'keepalives_idle': 60,
+        'keepalives_interval': 10,
+        'keepalives_count': 5,
+        'sslmode': config('DB_SSL_MODE', default='prefer'),
+        'application_name': application_name,
+        'options': (
+            f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)} "
+            f"-c idle_in_transaction_session_timeout={config('DB_IDLE_TIMEOUT', default=10000, cast=int)}"
+        ),
+    }
+
+
+def apply_database_defaults(database_config, application_name='cms_project'):
+    if database_config.get('ENGINE') == 'django.db.backends.postgresql':
+        database_options = postgres_options(application_name)
+        database_options.update(database_config.get('OPTIONS', {}))
+        database_config['OPTIONS'] = database_options
+        database_config.setdefault(
+            'TEST',
+            {
+                'NAME': config('TEST_DB_NAME', default='test_cms_project'),
+                'SERIALIZE': False,
+            },
+        )
+
+    database_config.setdefault('CONN_MAX_AGE', config('CONN_MAX_AGE', default=600, cast=int))
+    database_config.setdefault('CONN_HEALTH_CHECKS', True)
+    database_config.setdefault('ATOMIC_REQUESTS', False)
+    database_config.setdefault('AUTOCOMMIT', True)
+    return database_config
+
+
+def database_from_url(database_url, application_name='cms_project'):
+    if dj_database_url is None:
+        raise RuntimeError('DATABASE_URL is set but dj-database-url is not installed.')
+
+    database_config = dj_database_url.parse(
+        database_url,
+        conn_max_age=config('CONN_MAX_AGE', default=600, cast=int),
+        conn_health_checks=True,
+    )
+    return apply_database_defaults(database_config, application_name)
+
+
+def postgres_database_from_parts(application_name='cms_project'):
+    return apply_database_defaults(
+        {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        },
+        application_name,
+    )
+
+
 if 'test' in sys.argv:
     DATABASES = {
         'default': {
@@ -181,81 +249,75 @@ elif DEBUG:
         }
     }
 else:
+    DATABASE_URL = config('DATABASE_URL', default='')
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME'),
-            'USER': config('DB_USER'),
-            'PASSWORD': config('DB_PASSWORD'),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
-            'CONN_MAX_AGE': config('CONN_MAX_AGE', default=600, cast=int),
-            'CONN_HEALTH_CHECKS': True,
-            'OPTIONS': {
-                'connect_timeout': 5,
-                'keepalives': 1,
-                'keepalives_idle': 60,
-                'keepalives_interval': 10,
-                'keepalives_count': 5,
-                'sslmode': config('DB_SSL_MODE', default='prefer'),
-                'application_name': 'cms_project',
-                'options': (
-                    f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)} "
-                    f"-c idle_in_transaction_session_timeout={config('DB_IDLE_TIMEOUT', default=10000, cast=int)}"
-                ),
-            },
-            'TEST': {
-                'NAME': config('TEST_DB_NAME', default='test_cms_project'),
-                'SERIALIZE': False,
-            },
-            'ATOMIC_REQUESTS': False,
-            'AUTOCOMMIT': True,
-        }
+        'default': (
+            database_from_url(DATABASE_URL)
+            if DATABASE_URL
+            else postgres_database_from_parts()
+        )
     }
-    
+
     if config('DB_READ_REPLICA_ENABLED', default=False, cast=bool):
-        DATABASES['read_replica'] = {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_READ_NAME', default=config('DB_NAME')),
-            'USER': config('DB_READ_USER', default=config('DB_USER')),
-            'PASSWORD': config('DB_READ_PASSWORD', default=config('DB_PASSWORD')),
-            'HOST': config('DB_READ_HOST', default=config('DB_HOST', default='localhost')),
-            'PORT': config('DB_READ_PORT', default=config('DB_PORT', default='5432')),
-            'CONN_MAX_AGE': config('DB_READ_CONN_MAX_AGE', default=300, cast=int),
-            'OPTIONS': {
-                'connect_timeout': 5,
-                'keepalives': 1,
-                'keepalives_idle': 60,
-                'sslmode': config('DB_SSL_MODE', default='prefer'),
-                'application_name': 'cms_project_read',
-            },
-        }
-        
-        REST_FRAMEWORK = {
-            'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-            'DEFAULT_PERMISSION_CLASSES': [
-                'rest_framework.permissions.IsAuthenticated',
-            ],
-            'DEFAULT_AUTHENTICATION_CLASSES': [
-                'rest_framework.authentication.SessionAuthentication',
-                'rest_framework.authentication.BasicAuthentication',
-            ],
-            'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-            'PAGE_SIZE': 50,
-        }
-        
-        SPECTACULAR_SETTINGS = {
-            'TITLE': 'CMS Ticket Management API',
-            'DESCRIPTION': 'API for managing customer support tickets',
-            'VERSION': '1.0.0',
-            'SERVE_INCLUDE_SCHEMA': False,
-            'SWAGGER_UI_SETTINGS': {
-                'deepLinking': True,
-                'persistAuthorization': True,
-            },
-        }
-        
+        DB_READ_DATABASE_URL = config('DB_READ_DATABASE_URL', default='')
+        if DB_READ_DATABASE_URL:
+            DATABASES['read_replica'] = database_from_url(
+                DB_READ_DATABASE_URL,
+                'cms_project_read',
+            )
+        else:
+            default_database = DATABASES['default']
+            DATABASES['read_replica'] = apply_database_defaults(
+                {
+                    'ENGINE': 'django.db.backends.postgresql',
+                    'NAME': config('DB_READ_NAME', default=default_database.get('NAME')),
+                    'USER': config('DB_READ_USER', default=default_database.get('USER')),
+                    'PASSWORD': config(
+                        'DB_READ_PASSWORD',
+                        default=default_database.get('PASSWORD'),
+                    ),
+                    'HOST': config(
+                        'DB_READ_HOST',
+                        default=default_database.get('HOST', 'localhost'),
+                    ),
+                    'PORT': config(
+                        'DB_READ_PORT',
+                        default=default_database.get('PORT', '5432'),
+                    ),
+                    'CONN_MAX_AGE': config(
+                        'DB_READ_CONN_MAX_AGE',
+                        default=300,
+                        cast=int,
+                    ),
+                },
+                'cms_project_read',
+            )
+
         DATABASE_ROUTERS = ['cms_project.db_routers.PrimaryReplicaRouter']
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'CMS Ticket Management API',
+    'DESCRIPTION': 'API for managing customer support tickets',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+    },
+}
 
 if config('DB_CONNECTION_HEALTH_CHECKS', default=True, cast=bool):
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True

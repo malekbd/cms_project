@@ -94,8 +94,12 @@ jobs:
           python manage.py check --deploy
           
           echo "🔄 Restarting services..."
-          systemctl restart cms
-          systemctl reload nginx
+          if [ -f cms.service ]; then
+            sudo cp cms.service /etc/systemd/system/cms.service
+          fi
+          sudo systemctl daemon-reload
+          sudo systemctl restart cms
+          sudo systemctl reload nginx
           
           echo "✅ Staging deployment completed successfully!"
           
@@ -188,9 +192,12 @@ jobs:
           mv -T current_new current
           
           echo "⚡ Restarting services with new deployment..."
-          systemctl daemon-reload
-          systemctl restart cms
-          systemctl reload nginx
+          if [ -f "$DEPLOYMENT_DIR/cms.service" ]; then
+            sudo cp "$DEPLOYMENT_DIR/cms.service" /etc/systemd/system/cms.service
+          fi
+          sudo systemctl daemon-reload
+          sudo systemctl restart cms
+          sudo systemctl reload nginx
           
           echo "⏳ Waiting for services to stabilize..."
           sleep 10
@@ -214,8 +221,8 @@ jobs:
             echo "🔄 Attempting rollback..."
             cd /home/cmsuser/cms_project
             ln -sfn "$(readlink -f current.old)" current 2>/dev/null || true
-            systemctl restart cms
-            systemctl reload nginx
+            sudo systemctl restart cms
+            sudo systemctl reload nginx
             exit 1
           fi
           
@@ -265,8 +272,8 @@ jobs:
           echo "📦 Restoring from backup: $LATEST_BACKUP"
           
           # Stop services
-          systemctl stop cms
-          systemctl stop nginx
+          sudo systemctl stop cms
+          sudo systemctl stop nginx
           
           # Restore files
           tar -xzf "$LATEST_BACKUP/full_backup.tar.gz" -C /home/cmsuser/cms_project --strip-components=1
@@ -277,8 +284,8 @@ jobs:
           fi
           
           # Restart services
-          systemctl start cms
-          systemctl start nginx
+          sudo systemctl start cms
+          sudo systemctl start nginx
           
           echo "✅ Rollback completed successfully"
           

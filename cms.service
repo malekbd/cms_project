@@ -1,8 +1,7 @@
 [Unit]
 Description=CMS Django Application
-After=network.target postgresql.service redis-server.service
-Requires=postgresql.service
-Wants=redis-server.service
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target postgresql.service redis-server.service
 
 [Service]
 Type=notify
@@ -26,10 +25,11 @@ ProtectHome=false
 ReadWritePaths=/run/cms /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
-# Pre-start validation — ensure logs/ directory exists and is writable by cmsuser
-ExecStartPre=/bin/mkdir -p /home/cmsuser/cms_project/logs
-ExecStartPre=/bin/chown -R cmsuser:www-data /home/cmsuser/cms_project/logs
-ExecStartPre=/bin/chmod -R 755 /home/cmsuser/cms_project/logs
+# Pre-start validation — run with service-manager privileges so ownership
+# fixes do not fail before Gunicorn can start.
+ExecStartPre=+/bin/mkdir -p /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
+ExecStartPre=+/bin/chown -R cmsuser:www-data /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
+ExecStartPre=+/bin/chmod -R 755 /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
 
 # Process management
 ExecStart=/home/cmsuser/cms_project/venv/bin/python -m gunicorn \
