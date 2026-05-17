@@ -9,21 +9,21 @@ Type=notify
 User=cmsuser
 Group=www-data
 WorkingDirectory=/home/cmsuser/cms_project
-Environment="PATH=/home/cmsuser/cms_project/venv/bin"
+Environment="PATH=/home/cmsuser/cms_project/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="DJANGO_SETTINGS_MODULE=cms_project.settings"
 Environment="PYTHONPATH=/home/cmsuser/cms_project"
 Environment="PYTHONUNBUFFERED=1"
-Environment="HOME=/run/cms"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+Environment="HOME=/home/cmsuser"
 RuntimeDirectory=cms
 RuntimeDirectoryMode=0750
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/run/cms /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles
-ReadOnlyPaths=/home/cmsuser/cms_project
+ReadWritePaths=/run/cms /home/cmsuser/cms_project/logs /home/cmsuser/cms_project/media /home/cmsuser/cms_project/staticfiles /home/cmsuser/cms_project/__pycache__ /home/cmsuser/cms_project/cms_project/__pycache__ /home/cmsuser/cms_project/tickets/__pycache__
 PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
@@ -33,6 +33,11 @@ MemoryDenyWriteExecute=true
 RestrictSUIDSGID=true
 LockPersonality=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Pre-start validation — ensure logs/ directory exists and Django can import
+ExecStartPre=/bin/mkdir -p /home/cmsuser/cms_project/logs
+ExecStartPre=/bin/chown cmsuser:www-data /home/cmsuser/cms_project/logs
+ExecStartPre=/home/cmsuser/cms_project/venv/bin/python -c "import django; import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cms_project.settings'); django.setup()"
 
 # Process management
 ExecStart=/home/cmsuser/cms_project/venv/bin/python -m gunicorn \
