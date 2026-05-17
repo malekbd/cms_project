@@ -199,8 +199,10 @@ else:
                 'keepalives_count': 5,
                 'sslmode': config('DB_SSL_MODE', default='prefer'),
                 'application_name': 'cms_project',
-                'statement_timeout': config('DB_STATEMENT_TIMEOUT', default=30000, cast=int),
-                'idle_in_transaction_session_timeout': config('DB_IDLE_TIMEOUT', default=10000, cast=int),
+                'options': (
+                    f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)} "
+                    f"-c idle_in_transaction_session_timeout={config('DB_IDLE_TIMEOUT', default=10000, cast=int)}"
+                ),
             },
             'TEST': {
                 'NAME': config('TEST_DB_NAME', default='test_cms_project'),
@@ -254,11 +256,6 @@ else:
         }
         
         DATABASE_ROUTERS = ['cms_project.db_routers.PrimaryReplicaRouter']
-
-if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
-    DATABASES['default'].setdefault('OPTIONS', {})['options'] = (
-        f"-c statement_timeout={config('DB_STATEMENT_TIMEOUT', default=30000, cast=int)}"
-    )
 
 if config('DB_CONNECTION_HEALTH_CHECKS', default=True, cast=bool):
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
