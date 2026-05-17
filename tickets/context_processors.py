@@ -16,17 +16,17 @@ DEFAULT_BRAND = {
 
 def panel_branding(request):
     try:
-        settings = PanelBrandSettings.objects.first()
-        if not settings:
+        brand_settings = PanelBrandSettings.objects.first()
+        if not brand_settings:
             return {'panel_brand': DEFAULT_BRAND}
 
         return {
             'panel_brand': {
-                'brand_name': settings.brand_name or DEFAULT_BRAND['brand_name'],
-                'brand_subtitle': settings.brand_subtitle or DEFAULT_BRAND['brand_subtitle'],
-                'logo_icon': settings.logo_icon or DEFAULT_BRAND['logo_icon'],
-                'logo_image': settings.logo_image.url if settings.logo_image else '',
-                'logo_url': settings.logo_url or '',
+                'brand_name': brand_settings.brand_name or DEFAULT_BRAND['brand_name'],
+                'brand_subtitle': brand_settings.brand_subtitle or DEFAULT_BRAND['brand_subtitle'],
+                'logo_icon': brand_settings.logo_icon or DEFAULT_BRAND['logo_icon'],
+                'logo_image': brand_settings.logo_image.url if brand_settings.logo_image else '',
+                'logo_url': brand_settings.logo_url or '',
             }
         }
     except Exception:

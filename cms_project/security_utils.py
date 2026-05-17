@@ -10,7 +10,7 @@ import logging
 from urllib.parse import urlparse
 from django.core.exceptions import ValidationError
 from django.utils.html import strip_tags
-from django.utils.encoding import force_str
+from django.utils.encoding import smart_str
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class InputValidator:
             return text
         
         # Convert to string
-        text = force_str(text)
+        text = smart_str(text)
         
         # If no allowed tags specified, strip all tags
         if allowed_tags is None:
