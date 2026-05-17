@@ -1,5 +1,11 @@
 from django.db import models
-from django.db.models import DEFERRED
+
+try:
+    from django.db.models import DEFERRED
+except ImportError:
+    # Sentinel for Django < 5.1 — DEFERRED was introduced in Django 5.1
+    DEFERRED = object()
+
 from django.utils import timezone
 from typing import Optional, List, Dict, Any
 from django.db.models import QuerySet
