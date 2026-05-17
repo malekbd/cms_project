@@ -1,4 +1,9 @@
+import logging
+
 from .models import PanelBrandSettings
+
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_BRAND = {
@@ -10,16 +15,20 @@ DEFAULT_BRAND = {
 
 
 def panel_branding(request):
-    settings = PanelBrandSettings.objects.first()
-    if not settings:
-        return {'panel_brand': DEFAULT_BRAND}
+    try:
+        settings = PanelBrandSettings.objects.first()
+        if not settings:
+            return {'panel_brand': DEFAULT_BRAND}
 
-    return {
-        'panel_brand': {
-            'brand_name': settings.brand_name or DEFAULT_BRAND['brand_name'],
-            'brand_subtitle': settings.brand_subtitle or DEFAULT_BRAND['brand_subtitle'],
-            'logo_icon': settings.logo_icon or DEFAULT_BRAND['logo_icon'],
-            'logo_image': settings.logo_image.url if settings.logo_image else '',
-            'logo_url': settings.logo_url or '',
+        return {
+            'panel_brand': {
+                'brand_name': settings.brand_name or DEFAULT_BRAND['brand_name'],
+                'brand_subtitle': settings.brand_subtitle or DEFAULT_BRAND['brand_subtitle'],
+                'logo_icon': settings.logo_icon or DEFAULT_BRAND['logo_icon'],
+                'logo_image': settings.logo_image.url if settings.logo_image else '',
+                'logo_url': settings.logo_url or '',
+            }
         }
-    }
+    except Exception:
+        logger.exception("Unable to load panel branding settings; using defaults.")
+        return {'panel_brand': DEFAULT_BRAND}

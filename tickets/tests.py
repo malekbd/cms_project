@@ -1,5 +1,6 @@
 import json
 from datetime import date, timedelta, time
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -1320,6 +1321,22 @@ class ContextProcessorTest(TestCase):
         self.assertEqual(result['panel_brand']['logo_url'], 'https://example.com')
         # logo_image should be empty string because no image uploaded
         self.assertEqual(result['panel_brand']['logo_image'], '')
+
+    def test_panel_branding_uses_defaults_when_database_unavailable(self):
+        """panel_branding should not break template rendering if the DB is down."""
+        request = RequestFactory().get('/')
+        with patch(
+            'tickets.context_processors.PanelBrandSettings.objects.first',
+            side_effect=DatabaseError('branding table unavailable'),
+        ):
+            result = panel_branding(request)
+
+        self.assertEqual(result, {'panel_brand': {
+            'brand_name': 'FRC CMS & TICKETS',
+            'brand_subtitle': 'ADMIN PANEL',
+            'logo_icon': 'âš¡',
+            'logo_url': '',
+        }})
 
 
 class SeedConfigTest(TestCase):
