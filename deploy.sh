@@ -156,6 +156,15 @@ update_code() {
     if [ -d ".git" ]; then
         git pull origin main
         log "Code updated via git"
+        
+        # Fix ownership: git pull preserves the running user's ownership (root when
+        # deploy.sh is run via sudo), but the cms service runs as cmsuser:www-data.
+        # Without this chown, imported modules fail with PermissionError, crashing
+        # gunicorn at startup.
+        log "Fixing file ownership for cmsuser..."
+        chown -R cmsuser:cmsuser "$PROJECT_DIR"
+        chown -R cmsuser:www-data "$LOG_DIR" 2>/dev/null || true
+        log "Ownership fixed"
     else
         warn "Not a git repository. Manual code update required."
     fi
