@@ -3,6 +3,7 @@
 
 import multiprocessing
 import os
+import time
 
 # Server socket
 bind = os.getenv("GUNICORN_BIND", "unix:/run/cms/cms.sock")
@@ -112,5 +113,4 @@ def worker_exit(server, worker):
     """Called just after a worker has been exited."""
     server.log.info(f"Worker exited (pid: {worker.pid})")
 
-# Import time for timing
-import time
+# time imported at top of file — used by pre_request / post_request hooks
