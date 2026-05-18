@@ -23,18 +23,16 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <a href="{% url 'panel_dashboard' %}"
-        class="brand-logo {% if panel_brand.logo_image or panel_brand.logo_url %}has-custom-logo{% endif %}">
-        {% if panel_brand.logo_image or panel_brand.logo_url %}
+        class="brand-logo has-custom-logo {% if not panel_brand.logo_image and not panel_brand.logo_url %}has-static-brand-logo{% endif %}">
         <div class="brand-image-wrap">
           {% if panel_brand.logo_image %}
           <img src="{{ panel_brand.logo_image }}" alt="FRC CMS & TICKETS logo" class="brand-image">
-          {% else %}
+          {% elif panel_brand.logo_url %}
           <img src="{{ panel_brand.logo_url }}" alt="FRC CMS & TICKETS logo" class="brand-image">
+          {% else %}
+          <img src="{% static 'Logo.png' %}" alt="FRC CMS & TICKETS logo" class="brand-image">
           {% endif %}
         </div>
-        {% else %}
-        <div class="brand-icon">{{ panel_brand.logo_icon }}</div>
-        {% endif %}
         <div class="brand-text">
           <span class="brand-name">{{ panel_brand.brand_name }}</span>
           <span class="brand-sub">{{ panel_brand.brand_subtitle }}</span>

@@ -3685,6 +3685,24 @@ body {
   object-position: center;
 }
 
+.brand-logo.has-static-brand-logo {
+  gap: 0;
+}
+
+.brand-logo.has-static-brand-logo .brand-image-wrap {
+  width: 168px;
+  height: 62px;
+  min-width: 168px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.brand-logo.has-static-brand-logo .brand-text {
+  display: none;
+}
+
 .brand-name {
   font-size: 18px;
   letter-spacing: -0.03em;
