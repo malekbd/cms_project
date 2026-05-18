@@ -391,10 +391,6 @@ try:
         }
     }
     
-    if not DEBUG:
-        SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-        SESSION_CACHE_ALIAS = 'session'
-    
     CELERY_BROKER_URL = redis_url_for_db(REDIS_DB_CELERY)
     CELERY_RESULT_BACKEND = CELERY_BROKER_URL
     
@@ -426,6 +422,13 @@ except ImportError:
             }
         }
     }
+
+SESSION_ENGINE = config('SESSION_ENGINE', default='django.contrib.sessions.backends.db')
+if SESSION_ENGINE in {
+    'django.contrib.sessions.backends.cache',
+    'django.contrib.sessions.backends.cached_db',
+}:
+    SESSION_CACHE_ALIAS = config('SESSION_CACHE_ALIAS', default='session')
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']

@@ -154,6 +154,23 @@ If you must keep `/home/cmsuser/cms_project/cms.sock`, the service needs write a
    python manage.py migrate
    ```
 
+### Solution 3a: Login fails with Redis connection refused
+**Problem:** `/panel/login/` returns 500 after submitting valid credentials, and logs show `Error 111 connecting to localhost:6379`.
+
+**Fix:**
+The application uses database-backed sessions by default. Make sure migrations have created the session table:
+   ```bash
+   source /home/cmsuser/cms_project/venv/bin/activate
+   python manage.py migrate
+   sudo systemctl restart cms
+   ```
+
+If you explicitly set `SESSION_ENGINE=django.contrib.sessions.backends.cache`, Redis must be installed and running:
+   ```bash
+   sudo systemctl enable --now redis-server
+   redis-cli ping
+   ```
+
 ### Solution 4: Nginx configuration issues
 **Problem:** Nginx cannot connect to Gunicorn.
 
