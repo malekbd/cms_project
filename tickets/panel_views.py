@@ -229,6 +229,18 @@ def is_last_superuser(user):
     return user.is_superuser and not User.objects.filter(is_superuser=True).exclude(pk=user.pk).exists()
 
 
+def clear_dashboard_cache(user=None):
+    """Invalidate dashboard cache for a specific user or all users."""
+    today = get_current_date().isoformat()
+    if user and hasattr(user, 'id'):
+        cache.delete(f'dashboard_payload_{user.id}_{today}')
+    else:
+        # Clear for all users with known IDs (up to a reasonable max)
+        from django.contrib.auth.models import User as AuthUser
+        for uid in AuthUser.objects.values_list('id', flat=True):
+            cache.delete(f'dashboard_payload_{uid}_{today}')
+
+
 def build_dashboard_payload(user):
     # Cache key based on user ID and today's date
     cache_key = f'dashboard_payload_{user.id}_{get_current_date().isoformat()}'
@@ -344,8 +356,8 @@ def build_dashboard_payload(user):
         'recent_tickets': recent_tickets,
         'last_updated': timezone.now().strftime('%d %b %Y %I:%M:%S %p'),
     }
-    # Cache for 300 seconds (5 minutes) instead of 60 for better performance
-    cache.set(cache_key, payload, timeout=300)
+    # Cache for 30 seconds for responsiveness while maintaining performance
+    cache.set(cache_key, payload, timeout=30)
     return payload
 
 
@@ -488,6 +500,7 @@ def panel_add_ticket(request):
         form = TicketForm(request.POST)
         if form.is_valid():
             ticket = form.save()
+            clear_dashboard_cache(request.user)
             msg = form.cleaned_data.get('remark') or f"Ticket created with status: {ticket.status}"
             TicketRemark.objects.create(ticket=ticket, status=ticket.status, remark=msg, created_by=request.user.username)
             messages.success(request, f'Ticket #{ticket.sn} created!')
@@ -510,6 +523,7 @@ def panel_edit_ticket(request, pk):
         form = TicketForm(request.POST, instance=ticket)
         if form.is_valid():
             updated = form.save()
+            clear_dashboard_cache(request.user)
             if form.cleaned_data.get('remark'):
                 TicketRemark.objects.create(ticket=updated, status=updated.status, remark=form.cleaned_data.get('remark'), created_by=request.user.username)
             messages.success(request, f'Ticket #{pk} updated!')
@@ -524,6 +538,7 @@ def panel_delete_ticket(request, pk):
         ticket = get_scoped_ticket_or_404(request, pk)
         route_name = get_ticket_panel_route(ticket)
         ticket.delete()
+        clear_dashboard_cache(request.user)
         messages.success(request, f'Ticket #{pk} deleted.')
         return redirect(route_name)
     return redirect('panel_dashboard')
@@ -560,6 +575,7 @@ def panel_update_status(request, pk):
             old = ticket.status
             ticket.status = new_status
             ticket.save()
+            clear_dashboard_cache(request.user)
             TicketRemark.objects.create(ticket=ticket, status=new_status, remark=f'Status manually changed from {old} to {new_status}', created_by=request.user.username)
             return JsonResponse({'success': True})
     return JsonResponse({'success': False}, status=400)
@@ -572,6 +588,7 @@ def panel_add_remark(request, pk):
         remark_text = request.POST.get('remark', '').strip()
         if remark_text:
             TicketRemark.objects.create(ticket=ticket, status=ticket.status, remark=remark_text, created_by=request.user.username)
+            clear_dashboard_cache(request.user)
             messages.success(request, 'Remark added!')
     return redirect('panel_ticket_detail', pk=pk)
 
