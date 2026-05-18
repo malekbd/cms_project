@@ -3687,15 +3687,17 @@ body {
 
 .brand-logo.has-static-brand-logo {
   width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: flex-start;
-  gap: 0;
+  gap: 8px;
 }
 
 .brand-logo.has-static-brand-logo .brand-image-wrap {
-  width: 210px;
+  width: 190px;
   max-width: 100%;
-  height: 74px;
-  min-width: 210px;
+  height: 50px;
+  min-width: 190px;
   padding: 0;
   background: transparent;
   box-shadow: none;
@@ -3703,8 +3705,22 @@ body {
 }
 
 .brand-logo.has-static-brand-logo .brand-image {
-  object-fit: contain;
-  object-position: left top;
+  width: 190px;
+  max-width: none;
+  height: auto;
+  object-fit: initial;
+  object-position: initial;
+}
+
+.brand-logo.has-static-brand-logo .brand-tagline {
+  margin-left: 80px;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .brand-logo.has-static-brand-logo .brand-text {
