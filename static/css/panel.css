@@ -3650,7 +3650,7 @@ body {
 }
 
 .sidebar-brand {
-  padding: 24px 22px 20px;
+  padding: 24px 18px 22px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.08);
 }
 
@@ -3686,17 +3686,23 @@ body {
 }
 
 .brand-logo.has-static-brand-logo {
+  width: 100%;
   gap: 0;
 }
 
 .brand-logo.has-static-brand-logo .brand-image-wrap {
-  width: 168px;
-  height: 62px;
-  min-width: 168px;
+  width: 100%;
+  height: 88px;
+  min-width: 0;
   padding: 0;
   background: transparent;
   box-shadow: none;
   overflow: visible;
+}
+
+.brand-logo.has-static-brand-logo .brand-image {
+  object-fit: contain;
+  object-position: left center;
 }
 
 .brand-logo.has-static-brand-logo .brand-text {
