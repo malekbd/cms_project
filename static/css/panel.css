@@ -3663,6 +3663,28 @@ body {
   box-shadow: 0 14px 34px rgba(124, 58, 237, 0.35);
 }
 
+.brand-logo.has-custom-logo {
+  overflow: visible;
+}
+
+.brand-logo.has-custom-logo .brand-image-wrap {
+  width: 64px;
+  height: 54px;
+  min-width: 64px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+}
+
+.brand-logo.has-custom-logo .brand-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
 .brand-name {
   font-size: 18px;
   letter-spacing: -0.03em;
