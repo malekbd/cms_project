@@ -22,14 +22,10 @@
 <body>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <a href="{% url 'panel_dashboard' %}"
+      <a href="{% url 'panel_dashboard' %}" aria-label="{{ panel_brand.brand_name }}"
         class="brand-logo has-custom-logo has-static-brand-logo">
         <div class="brand-image-wrap">
           <img src="{% static 'logo.png' %}" alt="FRC CMS & TICKETS logo" class="brand-image">
-        </div>
-        <div class="brand-text">
-          <span class="brand-name">{{ panel_brand.brand_name }}</span>
-          <span class="brand-sub">{{ panel_brand.brand_subtitle }}</span>
         </div>
       </a>
     </div>
